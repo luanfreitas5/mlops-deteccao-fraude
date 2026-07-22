@@ -42,7 +42,7 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.2",
     # Contratos de dados
-    "pandera[polars]>=0.20",
+    "pandera[polars]>=0.32.1",
     # Configuração e validação em runtime
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
