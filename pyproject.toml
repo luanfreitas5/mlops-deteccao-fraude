@@ -37,7 +37,7 @@ classifiers = [ # https://pypi.org/classifiers/
 # --- Dependências de runtime (instale apenas o que o projeto precisar) -------
 dependencies = [
     # Manipulação de dados (preferência: polars lazy) + storage colunar
-    "polars>=1.0",
+    "polars>=1.43.0",
     "pyarrow>=16.0",
     "numpy>=1.26",
     "pandas>=2.2",
