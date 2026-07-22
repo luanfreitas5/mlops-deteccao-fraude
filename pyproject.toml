@@ -113,7 +113,7 @@ dev = [
     # Testes
     "pytest>=8.2",                  # Um framework de teste para Python
     "pytest-cov>=5.0",              # Um plugin para pytest que fornece cobertura de código
-    "hypothesis>=6.100",            # Um framework de teste property-based para Python
+    "hypothesis>=6.158.1",            # Um framework de teste property-based para Python
     "httpx>=0.27",                  # Cliente HTTP exigido pelo TestClient do FastAPI (tests/test_api.py)
     # Notebooks
     "nbqa>=1.8",                    # Um utilitário para aplicar linters a notebooks do Jupyter
