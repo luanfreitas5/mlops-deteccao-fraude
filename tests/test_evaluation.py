@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from src.evaluation.classification import compute_metrics
-from src.evaluation.evaluator import evaluate_model
+from src.evaluation.evaluator import _bootstrap_pr_auc_ci, evaluate_model
 from src.evaluation.threshold import (
     find_cost_optimal_threshold,
     find_threshold_for_recall,
@@ -32,6 +32,14 @@ def test_find_threshold_for_recall_reaches_target() -> None:
     assert recall >= 0.66
 
 
+def test_find_threshold_for_recall_falls_back_to_min_when_unreachable() -> None:
+    """Se nenhum ponto atinge o recall-alvo, retorna o menor threshold disponível."""
+    y = np.array([0, 0, 1, 1])
+    p = np.array([0.1, 0.4, 0.35, 0.8])
+    threshold = find_threshold_for_recall(y, p, target_recall=1.5)
+    assert threshold == 0.1
+
+
 def test_cost_optimal_threshold_prefers_recall_when_fn_expensive() -> None:
     """Com FN muito caro, o threshold escolhido não deixa passar fraudes óbvias."""
     y = np.array([0, 0, 1, 1])
@@ -49,3 +57,11 @@ def test_evaluate_model_returns_ci() -> None:
     result = evaluate_model(y, p, threshold=0.5, n_boot=100)
     lower, upper = result.pr_auc_ci
     assert lower <= upper
+
+
+def test_bootstrap_pr_auc_ci_returns_zero_when_single_class() -> None:
+    """Com uma única classe presente, toda reamostragem é descartada e o IC é (0, 0)."""
+    y = np.zeros(20, dtype=int)
+    p = np.linspace(0.0, 1.0, 20)
+    ci = _bootstrap_pr_auc_ci(y, p, n_boot=20, seed=0)
+    assert ci == (0.0, 0.0)

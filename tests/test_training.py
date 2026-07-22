@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import numpy as np
 import polars as pl
 
-from src.config.settings import Settings
+from src.config.settings import ImbalanceConfig, Settings
 from src.features.engineering import get_model_features
 from src.models.factory import ModelName
 from src.training.cross_validation import cross_validate_pr_auc
-from src.training.trainer import build_training_pipeline, prepare_xy, train_model
+from src.training.trainer import (
+    _compute_scale_pos_weight,
+    build_training_pipeline,
+    prepare_xy,
+    train_model,
+)
 
 
 def test_prepare_xy_shapes(synthetic_transactions: pl.DataFrame) -> None:
@@ -49,3 +55,20 @@ def test_cross_validate_returns_positive_pr_auc(
     result = cross_validate_pr_auc(pipeline, x, y, n_folds=3, seed=42)
     assert result.mean > 0.3
     assert result.ci_95 >= 0.0
+
+
+def test_compute_scale_pos_weight_returns_one_without_positives() -> None:
+    """Sem exemplos da classe positiva, retorna 1.0 em vez de dividir por zero."""
+    y = np.zeros(10, dtype=int)
+    assert _compute_scale_pos_weight(y) == 1.0
+
+
+def test_build_training_pipeline_smote_strategy_adds_smote_step(
+    synthetic_transactions: pl.DataFrame,
+) -> None:
+    """Com a estratégia 'smote', o pipeline inclui a etapa de reamostragem."""
+    settings = Settings(imbalance=ImbalanceConfig(strategy="smote"))
+    _, y = prepare_xy(synthetic_transactions)
+    assert y is not None
+    pipeline = build_training_pipeline(ModelName.LOGISTIC_REGRESSION, settings, y)
+    assert "smote" in dict(pipeline.steps)

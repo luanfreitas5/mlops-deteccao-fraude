@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 
 from src.config.settings import Settings
 from src.inference.predictor import FraudPredictor
 from src.models.factory import ModelName
+from src.models.persistence import save_model
 from src.training.trainer import build_training_pipeline, prepare_xy, train_model
 
 
@@ -40,3 +43,20 @@ def test_predict_respects_threshold(
     predictor.threshold = 0.8
     alerts_high = predictor.predict(features).sum()
     assert alerts_high <= alerts_low
+
+
+def test_from_path_loads_pipeline_and_applies_threshold(
+    synthetic_transactions: pl.DataFrame, settings: Settings, tmp_path: Path
+) -> None:
+    """``from_path`` carrega o pipeline serializado e aplica o threshold informado."""
+    x, y = prepare_xy(synthetic_transactions)
+    assert y is not None
+    pipeline = build_training_pipeline(ModelName.LOGISTIC_REGRESSION, settings, y)
+    pipeline = train_model(pipeline, x, y)
+    model_path = save_model(pipeline, tmp_path / "modelo.joblib")
+
+    predictor = FraudPredictor.from_path(model_path, threshold=0.42)
+
+    assert predictor.threshold == 0.42
+    proba = predictor.predict_proba(synthetic_transactions.drop("Class"))
+    assert proba.shape[0] == synthetic_transactions.height

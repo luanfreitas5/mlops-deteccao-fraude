@@ -6,6 +6,13 @@ Gera DataFrames sintéticos pequenos que imitam o dataset Credit Card Fraud
 
 from __future__ import annotations
 
+import matplotlib
+
+# Backend não interativo: evita que os testes de visualização tentem abrir uma
+# janela Tk (indisponível/instável em ambientes headless de CI), causando falhas
+# intermitentes ao gerar figuras.
+matplotlib.use("Agg")
+
 import numpy as np
 import polars as pl
 import pytest

@@ -8,6 +8,7 @@ import pytest
 
 from src.config.settings import ModelParams
 from src.exceptions.model import ModelNotFoundError
+from src.models.base import Estimator
 from src.models.factory import ModelName, create_estimator
 from src.models.persistence import load_model, save_model
 
@@ -39,3 +40,18 @@ def test_load_missing_model_raises(tmp_path: Path) -> None:
     """Carregar um modelo inexistente levanta ModelNotFoundError."""
     with pytest.raises(ModelNotFoundError):
         load_model(tmp_path / "ausente.joblib")
+
+
+def test_save_model_without_metadata_skips_json(tmp_path: Path) -> None:
+    """Sem ``metadata``, apenas o ``.joblib`` é gravado (nenhum JSON ao lado)."""
+    obj = {"pesos": [1, 2, 3]}
+    path = save_model(obj, tmp_path / "model.joblib")
+    assert path.exists()
+    assert not path.with_suffix(".json").exists()
+
+
+def test_estimator_protocol_methods_are_structural_stubs() -> None:
+    """O corpo dos métodos do Protocol é apenas o contrato estrutural (sem lógica)."""
+    assert Estimator.fit(object(), None) is None  # pyright: ignore[reportAbstractUsage, reportArgumentType]
+    assert Estimator.predict(object(), None) is None  # pyright: ignore[reportAbstractUsage, reportArgumentType]
+    assert Estimator.predict_proba(object(), None) is None  # pyright: ignore[reportAbstractUsage, reportArgumentType]
