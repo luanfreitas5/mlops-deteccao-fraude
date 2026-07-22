@@ -1,0 +1,5 @@
+# Padrões ignorados pelo DVC ao rastrear diretórios.
+# https://dvc.org/doc/user-guide/project-structure/dvcignore-files
+*.tmp
+*.log
+.ipynb_checkpoints/
