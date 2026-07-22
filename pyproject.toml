@@ -1,0 +1,283 @@
+# =============================================================================
+# pyproject.toml — fonte única de verdade para dependências e configuração de
+# ferramentas. Alinhado ao CLAUDE.md (Data Science Projects).
+# Gerenciador recomendado: uv. Lock file (uv.lock) DEVE ser commitado.
+# =============================================================================
+
+[project]
+name = "mlops-deteccao-fraude"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Luan Freitas", email = "luan.freitas@gmail.com" }]
+keywords = [
+    "mlops",
+    "fraude",
+    "detecção de fraude",
+    "machine learning",
+    "data science",
+    "pipeline de machine learning",
+    "explicabilidade",
+]
+classifiers = [ # https://pypi.org/classifiers/
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Environment :: GPU :: NVIDIA CUDA :: 12",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+]
+
+# --- Dependências de runtime (instale apenas o que o projeto precisar) -------
+dependencies = [
+    # Manipulação de dados (preferência: polars lazy) + storage colunar
+    "polars>=1.0",
+    "pyarrow>=16.0",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    # Contratos de dados
+    "pandera[polars]>=0.20",
+    # Configuração e validação em runtime
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    # Progresso e logging
+    "rich>=13.7",
+    # Visualização
+    "seaborn>=0.13",
+    "matplotlib>=3.9",
+    "plotly>=6.0",
+    # Modelagem e desbalanceamento
+    "scikit-learn>=1.5",
+    "xgboost>=2.1",
+    "imbalanced-learn>=0.12",
+    "joblib>=1.4",
+    # Rastreamento de experimentos
+    "mlflow>=2.14",
+]
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+# Restrições em dependências transitivas por segurança (pip-audit).
+# gitpython < 3.1.51 (puxado pelo mlflow) tem 2 CVEs corrigidos na 3.1.51:
+# GHSA-2f96-g7mh-g2hx e GHSA-v396-v7q4-x2qj.
+# pyasn1 < 0.6.4 tem 2 CVEs corrigidos na 0.6.4: CVE-2026-59885 e CVE-2026-59886.
+constraint-dependencies = ["gitpython>=3.1.51", "pyasn1>=0.6.4"]
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu129" }
+torchvision = { index = "pytorch-cu129" }
+torchaudio = { index = "pytorch-cu129" }
+
+# --- Extras opcionais (ative por projeto: uv sync --extra name, etc.) -------
+[project.optional-dependencies]
+# Dashboard interativo de explicabilidade (Streamlit + Plotly)
+app = [
+    "streamlit>=1.59.2",
+    "plotly>=6.9.0",
+]
+
+
+# --- Dependências de desenvolvimento (não publicadas; PEP 735) --------------
+[dependency-groups]
+dev = [
+    # Lint + format
+    "ruff>=0.5",                    # Um linter e formatador de código Python extremamente rápido - substitui flake8/isort/black
+    # Type checking (roda no CI, não no pre-commit)
+    "basedpyright>=1.13",           # Um type checker estático para Python, baseado no Pyright da Microsoft - substitui mypy
+    # Segurança (roda no CI)
+    "bandit>=1.7",                  # Um analisador de segurança para código Python
+    "pip-audit>=2.7",               # Um auditor de segurança para dependências Python (substitui o safety, que arrastava nltk vulnerável)
+    "detect-secrets>=1.5",          # Um detector de segredos em código Python
+    # Qualidade / complexidade / docstrings
+    "vulture>=2.11",                # Um verificador de código morto para Python
+    "refurb>=2.0",                  # Um utilitário para refatoração de código Python
+    "xenon>=0.9",                   # Um analisador de complexidade para Python
+    "radon>=6.0",                   # Um analisador de complexidade para Python
+    "interrogate>=1.7",             # Um verificador de docstrings para Python
+    # Testes
+    "pytest>=8.2",                  # Um framework de teste para Python
+    "pytest-cov>=5.0",              # Um plugin para pytest que fornece cobertura de código
+    "hypothesis>=6.100",            # Um framework de teste property-based para Python
+    "httpx>=0.27",                  # Cliente HTTP exigido pelo TestClient do FastAPI (tests/test_api.py)
+    # Notebooks
+    "nbqa>=1.8",                    # Um utilitário para aplicar linters a notebooks do Jupyter
+    "nbstripout>=0.7",              # Um utilitário para remover saídas e metadados de notebooks do Jupyter
+    # Workflow
+    "pre-commit>=3.7",              # Um framework para gerenciar hooks de commit no Git
+    "commitizen>=4.16.5",             # Um utilitário para manter o histórico de commits consistente
+    # Documentação
+    "mkdocs-material>=9.7.7",         # Um tema para MkDocs
+    "mkdocstrings[python]>=0.25",   # Um plugin para MkDocs que gera documentação a partir de docstrings
+    # Profiling (use sob demanda)
+    "scalene>=1.5",                 # Um profiler de performance para Python
+    # Ferramentas para rodar Data Wrangler no Vscode
+    "pip>=26.1.2",                  # Um gerenciador de pacotes para Python
+    "ipykernel>=7.3.0",             # Um kernel para Jupyter que executa código Python
+    "ipywidgets>=8.1.8"             # Um conjunto de widgets interativos para Jupyter
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.urls]
+Homepage = "https://github.com/luanfreitas5/mlops-deteccao-fraude"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[project.scripts]
+churn = "src.main:main"
+
+
+# =============================================================================
+# RUFF — lint + format (substitui flake8/isort/black)
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort (organização de imports)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade (sintaxe moderna)
+    "B",      # flake8-bugbear (bugs comuns e más práticas)
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "RET",    # flake8-return
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib (usar Path em vez de os.path)
+    "PD",     # pandas-vet — antipadrões específicos de pandas
+    "NPY",    # NumPy-specific rules
+    "PERF",   # perflint — antipadrões de performance
+    "RUF",    # regras específicas do próprio Ruff
+    "PL",     # pylint (subconjunto)
+    "TRY",    # tryceratops — boas práticas de exception handling
+]
+ignore = [
+    "PLR0913", # muitos argumentos em função — comum em pipelines de ML
+    "PLR2004", # "magic value" em comparação — comum em thresholds de modelo
+    "TRY003",  # mensagem longa em exceção customizada
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"  # docstrings no formato NumPy
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG", "PLR2004"]        # fixtures e valores fixos em testes
+"notebooks/*" = ["E402", "F401"]      # imports fora de ordem/não usados em notebooks
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# =============================================================================
+# BASEDPYRIGHT — type checking estático (roda no CI)
+# =============================================================================
+[tool.basedpyright]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+include = ["src"]
+exclude = ["**/__pycache__", "notebooks", "data", "models"]
+reportMissingTypeStubs = false
+
+# =============================================================================
+# BANDIT — análise de segurança (roda no CI)
+# =============================================================================
+[tool.bandit]
+exclude_dirs = ["tests", "notebooks", ".venv"]
+
+# =============================================================================
+# VULTURE — detecção de código morto
+# =============================================================================
+[tool.vulture]
+min_confidence = 80
+paths = ["src"]
+exclude = ["notebooks/"]
+
+# =============================================================================
+# REFURB — sugestões de modernização
+# =============================================================================
+[tool.refurb]
+# Códigos ignorados: ajuste conforme o estilo do projeto
+ignore = [
+    "FURB105",  # print() sem parênteses vazios — inofensivo, pode ignorar
+    "FURB126",  # return implícito — às vezes reduz clareza em funções longas
+]
+
+# =============================================================================
+# PYTEST — testes (unit, integração, property-based, comportamentais)
+# =============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--strict-markers",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+markers = [
+    "smoke: testes rápidos rodados no pre-commit",
+    "integration: testes de pipeline ponta a ponta",
+    "ml: testes comportamentais / de regressão de métrica",
+    "slow: testes lentos (pulados por padrão localmente)",
+]
+
+# =============================================================================
+# COVERAGE — meta de cobertura ≥ 80%
+# =============================================================================
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["src/main.py", "*/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+# =============================================================================
+# INTERROGATE — cobertura de docstrings
+# =============================================================================
+[tool.interrogate]
+fail-under = 80
+ignore-init-method = true
+ignore-magic = true
+exclude = ["tests", "notebooks", "docs"]
+
+# =============================================================================
+# COMMITIZEN — Conventional Commits + SemVer + CHANGELOG
+# =============================================================================
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "pep621"   # lê [project].version
+tag_format = "v$version"
+update_changelog_on_bump = true
+major_version_zero = true
