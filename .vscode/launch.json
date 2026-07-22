@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Pipeline: all",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "src.main",
+      "args": ["all", "--model", "xgboost"],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Pipeline: preprocess",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "src.main",
+      "args": ["preprocess"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "API: uvicorn",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Pytest: arquivo atual",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v"],
+      "console": "integratedTerminal"
+    }
+  ]
+}

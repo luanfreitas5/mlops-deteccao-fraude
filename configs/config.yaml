@@ -1,0 +1,31 @@
+# =============================================================================
+# config.yaml — Configurações gerais do projeto de detecção de fraude.
+# Carregado e validado em tempo de execução por src/config/settings.py (Pydantic).
+# =============================================================================
+project_name: "mlops-deteccao-fraude"
+random_seed: 42
+
+# Divisão dos dados (train / validation / test)
+split:
+  strategy: "stratified"   # "stratified" ou "temporal" (usa a coluna Time)
+  test_size: 0.20
+  val_size: 0.20           # fração retirada do treino para validação
+  target_column: "Class"
+  time_column: "Time"
+
+# Estratégia de tratamento do desbalanceamento
+imbalance:
+  strategy: "scale_pos_weight"   # "scale_pos_weight" | "smote" | "none"
+  smote_sampling_strategy: 0.10  # razão minoritária/majoritária alvo (só p/ SMOTE)
+
+# Métrica principal e threshold de decisão
+evaluation:
+  primary_metric: "average_precision"   # PR-AUC — robusta a desbalanceamento extremo
+  target_recall: 0.85                   # recall mínimo desejado ao escolher o threshold
+  cv_folds: 5
+
+# Custo de negócio (usado na otimização do threshold)
+# Fraude não detectada (FN) costuma custar muito mais que uma revisão de FP.
+business_cost:
+  false_negative: 100.0   # custo de deixar passar uma fraude
+  false_positive: 1.0     # custo de revisar/bloquear uma transação legítima

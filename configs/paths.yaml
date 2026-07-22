@@ -1,0 +1,26 @@
+# =============================================================================
+# paths.yaml — Caminhos de dados, modelos e saídas (relativos à raiz do projeto).
+# Nunca use caminhos hardcoded no código; centralize aqui e em src/config/paths.py.
+# =============================================================================
+data:
+  raw: "data/raw/creditcard.csv"
+  interim: "data/interim"
+  processed: "data/processed"
+  train: "data/processed/train.parquet"
+  val: "data/processed/val.parquet"
+  test: "data/processed/test.parquet"
+
+models:
+  dir: "models"
+  preprocessor: "models/preprocessor.joblib"
+  model: "models/fraud_model.joblib"
+  metadata: "models/model_metadata.json"
+
+reports:
+  figures: "reports/figures"
+  metrics: "reports/metrics.json"
+  model_cards: "reports/model_cards"
+  datasheets: "reports/datasheets"
+
+logs: "logs"
+mlflow_tracking_uri: "file:./mlruns"

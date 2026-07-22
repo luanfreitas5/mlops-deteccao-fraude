@@ -1,0 +1,14 @@
+# =============================================================================
+# deploy.yaml — Configurações de serving da API de inferência (FastAPI).
+# =============================================================================
+api:
+  title: "API de Detecção de Fraude"
+  version: "0.1.0"
+  host: "0.0.0.0"            # noqa: interface de bind dentro do container
+  port: 8000
+  # Threshold de decisão em produção. Deve refletir o valor otimizado na
+  # avaliação (reports/metrics.json -> best_threshold) e ser versionado junto
+  # ao modelo. Requisições >= threshold são classificadas como fraude.
+  decision_threshold: 0.5
+  model_path: "models/fraud_model.joblib"
+  preprocessor_path: "models/preprocessor.joblib"

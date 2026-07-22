@@ -1,0 +1,10 @@
+# =============================================================================
+# logging.yaml — Configuração do logger (console rich + arquivo com rotação diária).
+# Nível ajustável sem tocar no código. Mensagens sempre em pt-BR.
+# =============================================================================
+level: "INFO"                # DEBUG | INFO | WARNING | ERROR | CRITICAL
+file_format: "%(asctime)s \t %(levelname)s \t %(name)s \t %(message)s"
+date_format: "%Y-%m-%d %H:%M:%S"
+log_dir: "logs"
+rich_console: true           # usa RichHandler no console
+show_path: true              # mostra arquivo:linha no console

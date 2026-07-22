@@ -1,0 +1,56 @@
+# =============================================================================
+# mkdocs.yml — documentação MkDocs Material + mkdocstrings (API a partir das
+# docstrings pt-BR no formato NumPy).
+# =============================================================================
+site_name: MLOps — Detecção de Fraude
+site_description: Pipeline MLOps de detecção de fraude em cartão de crédito.
+repo_url: https://github.com/luanfreitas5/mlops-deteccao-fraude
+repo_name: luanfreitas5/mlops-deteccao-fraude
+
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      toggle:
+        icon: material/weather-night
+        name: Modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      toggle:
+        icon: material/weather-sunny
+        name: Modo claro
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Início: index.md
+  - Guias:
+      - Instalação: guia_instalacao.md
+      - Uso: guia_uso.md
+      - Arquitetura: arquitetura.md
+  - Referência da API: referencia.md
