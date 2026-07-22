@@ -1,0 +1,60 @@
+# =============================================================================
+# Reproducibility — garante que o ambiente e os notebooks commitados
+# refletem exatamente o que está versionado:
+#   1) uv.lock sincronizado com pyproject.toml (senão `uv sync` no CI/máquina
+#      de outro dev resolveria versões diferentes silenciosamente);
+#   2) notebooks sem outputs sujos e lintados com o mesmo Ruff do resto do
+#      código (nbstripout/nbqa já são dependências do projeto, mas não
+#      rodavam em CI até agora).
+#
+# Observação: o projeto ainda não tem DVC de fato configurado (não há
+# .dvc/ nem dvc.yaml no repo, embora o .gitignore já reserve espaço pra
+# isso) — o dataset Olist é baixado manualmente em data/raw. Quando o DVC
+# for adotado, adicione aqui um job `dvc status`/`dvc repro --dry`.
+# =============================================================================
+name: Reproducibility
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+concurrency:
+  group: reproducibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lockfile:
+    name: uv.lock sincronizado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.12"
+
+      - name: Falhar se uv.lock estiver desatualizado
+        run: uv lock --check
+
+  notebooks:
+    name: Notebooks limpos e lintados
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.12"
+
+      - run: uv sync --dev
+
+      - name: Checar se algum notebook tem output não removido
+        run: uv run nbstripout notebooks/*
+
+      - name: Lint dos notebooks (nbqa + ruff)
+        run: uv run nbqa ruff notebooks/

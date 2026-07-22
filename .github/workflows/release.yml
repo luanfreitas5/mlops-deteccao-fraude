@@ -1,0 +1,67 @@
+# =============================================================================
+# Release — bump de versão via Commitizen (lê Conventional Commits, atualiza
+# CHANGELOG.md e a versão em pyproject.toml, conforme [tool.commitizen]),
+# cria a tag e publica uma GitHub Release.
+# Disparo manual (workflow_dispatch): decisão explícita de quando publicar,
+# em vez de liberar release a cada push em main.
+# =============================================================================
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: "Forçar o tipo de bump (vazio = detecção automática pelos commits)"
+        required: false
+        type: choice
+        options: ["", "PATCH", "MINOR", "MAJOR"]
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Bump de versão + changelog + release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.12"
+
+      - run: uv sync --dev
+
+      - name: Configurar identidade do git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump com Commitizen (versão + CHANGELOG.md)
+        id: cz
+        run: |
+          INCREMENT="${{ inputs.increment }}"
+          if [ -n "$INCREMENT" ]; then
+            uv run cz bump --changelog --yes --increment "$INCREMENT"
+          else
+            uv run cz bump --changelog --yes
+          fi
+          echo "version=$(uv run cz version --project)" >> "$GITHUB_OUTPUT"
+
+      - name: Enviar commit e tag
+        run: git push --follow-tags
+
+      - name: Criar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.cz.outputs.version }}"
+          generate_release_notes: true
