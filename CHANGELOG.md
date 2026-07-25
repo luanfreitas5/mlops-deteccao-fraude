@@ -1,7 +1,8 @@
-## v0.2.0 (2026-07-25)
+## v0.3.0 (2026-07-25)
 
 ### Feat
 
+- atualiza workflows e configurações do projeto
 - adiciona arquivo .secrets.baseline com configurações de detecção de segredos
 - adiciona testes para validação de configuração e métricas
 - adiciona configuração do pre-commit para checagens automáticas
