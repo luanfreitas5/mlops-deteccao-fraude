@@ -6,7 +6,7 @@ RUN := $(UV) run python src/main.py    # 'src' vira raiz do path ao rodar o scri
 .DEFAULT_GOAL := help
 .PHONY: help init venv install install-all install-models hooks pre-commit update-hooks update lock export \
 	check format lint typecheck security deadcode complexity docstrings refurb quality \
-	test smoke precommit docs docs-serve docs-deploy profile clean cache jupyter notebook add remove tree \
+	update-version test smoke hooks pre-commit update-hooks docs docs-serve docs-deploy profile clean cache jupyter notebook add remove tree \
 	clean-processed clean-reports clean-outputs clean-notebooks features train evaluate explain pipeline app
 
 help:  ## Lista os alvos disponíveis
@@ -28,17 +28,6 @@ install-all:  ## Instala tudo (todos os extras + dev)
 
 install-models:  ## Instala os extras dos modelos Hugging Face (torch + transformers)
 	$(UV) sync --extra models --dev
-
-hooks:  ## Instala os hooks do pre-commit
-	$(UV) run pre-commit install
-	$(UV) run pre-commit install --hook-type commit-msg
-	$(UV) run detect-secrets scan | Out-File -Encoding utf8 .secrets.baseline
-
-pre-commit:  ## Roda todos os hooks do pre-commit em todos os arquivos
-	$(UV) run pre-commit run --all-files
-
-update-hooks:  ## Atualiza os hooks do pre-commit
-	$(UV) run pre-commit autoupdate
 
 update:  ## Atualiza todas as dependências e sincroniza
 	$(UV) lock --upgrade
@@ -88,8 +77,22 @@ test:  ## Roda os testes com cobertura
 smoke:  ## Roda apenas os smoke tests
 	$(UV) run pytest -m smoke -q
 
-precommit:  ## Roda todos os hooks do pre-commit em todos os arquivos
+hooks:  ## Instala os hooks do pre-commit
+	$(UV) run pre-commit install
+	$(UV) run pre-commit install --hook-type commit-msg
+	# $(UV) run detect-secrets scan | Out-File -Encoding utf8 .secrets.baseline
+
+pre-commit:  ## Roda todos os hooks do pre-commit em todos os arquivos
 	$(UV) run pre-commit run --all-files
+
+update-hooks:  ## Atualiza os hooks do pre-commit
+	$(UV) run pre-commit autoupdate
+	$(UV) run pre-commit run --all-files
+
+update-version:
+	$(UV) add --dev commitizen
+	$(UV) run cz changelog
+	$(UV) run cz bump --changelog --yes
 
 # --- Limpeza de saídas do pipeline ------------------------------------------
 clean-processed:  ## Remove os artefatos de dados processados

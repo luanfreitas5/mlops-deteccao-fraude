@@ -6,7 +6,7 @@
 
 [project]
 name = "mlops-deteccao-fraude"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 readme = "README.md"
 requires-python = ">=3.10"
@@ -128,8 +128,8 @@ dev = [
     "scalene>=1.5",                 # Um profiler de performance para Python
     # Ferramentas para rodar Data Wrangler no Vscode
     "pip>=26.1.2",                  # Um gerenciador de pacotes para Python
-    "ipykernel>=7.3.0",             # Um kernel para Jupyter que executa código Python
-    "ipywidgets>=8.1.8"             # Um conjunto de widgets interativos para Jupyter
+    "ipykernel>=7.3.0",             # Um kernel para Jupyter que executa código Python             # Um conjunto de widgets interativos para Jupyter
+    "ipywidgets>=8.1.8",
 ]
 
 [build-system]

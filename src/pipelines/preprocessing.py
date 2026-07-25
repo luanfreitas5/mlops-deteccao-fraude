@@ -60,9 +60,9 @@ def run_preprocessing_pipeline(settings: Settings) -> PreprocessingOutput:
     data_hash = hash_file(paths.data_raw)
     logger.info("Hash dos dados brutos: %s", data_hash)
 
-    df = load_raw_transactions(paths.data_raw)
-    df = drop_duplicates(df)
-    split = split_data(df, settings.split, seed=settings.random_seed)
+    transactions_df = load_raw_transactions(paths.data_raw)
+    transactions_df = drop_duplicates(transactions_df)
+    split = split_data(transactions_df, settings.split, seed=settings.random_seed)
 
     write_parquet(split.train, paths.data_processed / "train.parquet")
     write_parquet(split.val, paths.data_processed / "val.parquet")

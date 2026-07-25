@@ -59,15 +59,19 @@ def load_raw_transactions(
         )
 
     logger.info("Carregando transações brutas de %s", path)
-    df = pl.read_csv(path, schema_overrides={"Time": pl.Float64})
+    transactions_df = pl.read_csv(path, schema_overrides={"Time": pl.Float64})
 
-    missing = set(ALL_COLUMNS) - set(df.columns)
+    missing = set(ALL_COLUMNS) - set(transactions_df.columns)
     if missing:
         raise RawDataNotFoundError(f"Colunas ausentes no arquivo bruto: {sorted(missing)}")
 
-    df = df.select(ALL_COLUMNS)
-    logger.info("Transações carregadas: %d linhas, %d colunas", df.height, df.width)
+    transactions_df = transactions_df.select(ALL_COLUMNS)
+    logger.info(
+        "Transações carregadas: %d linhas, %d colunas",
+        transactions_df.height,
+        transactions_df.width,
+    )
 
     if validate:
-        df = validate_transactions(df)
-    return df
+        transactions_df = validate_transactions(transactions_df)
+    return transactions_df

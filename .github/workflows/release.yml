@@ -12,7 +12,7 @@ on:
     inputs:
       increment:
         description: "Forçar o tipo de bump (vazio = detecção automática pelos commits)"
-        required: false
+        required: true
         type: choice
         options: ["", "PATCH", "MINOR", "MAJOR"]
         default: ""
@@ -60,8 +60,11 @@ jobs:
       - name: Enviar commit e tag
         run: git push --follow-tags
 
+      - name: Extrair trecho novo do CHANGELOG.md
+        run: awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > release-notes.md
+
       - name: Criar GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ steps.cz.outputs.version }}"
-          generate_release_notes: true
+          body_path: release-notes.md

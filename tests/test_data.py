@@ -28,9 +28,9 @@ def test_load_raw_transactions_reads_and_validates(
     """Um CSV bruto válido é carregado, reordenado e validado com sucesso."""
     path = tmp_path / "creditcard.csv"
     synthetic_transactions.write_csv(path)
-    df = load_raw_transactions(path)
-    assert df.columns == ALL_COLUMNS
-    assert df.height == synthetic_transactions.height
+    transactions_df = load_raw_transactions(path)
+    assert transactions_df.columns == ALL_COLUMNS
+    assert transactions_df.height == synthetic_transactions.height
 
 
 def test_load_raw_transactions_can_skip_validation(
@@ -39,8 +39,8 @@ def test_load_raw_transactions_can_skip_validation(
     """Com ``validate=False``, o contrato de dados não é aplicado."""
     path = tmp_path / "creditcard.csv"
     synthetic_transactions.write_csv(path)
-    df = load_raw_transactions(path, validate=False)
-    assert df.height == synthetic_transactions.height
+    transactions_df = load_raw_transactions(path, validate=False)
+    assert transactions_df.height == synthetic_transactions.height
 
 
 def test_load_raw_transactions_missing_columns_raises(
