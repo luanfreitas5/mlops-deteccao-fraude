@@ -62,3 +62,9 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
+
+  # --- uv-lock: bloqueia commit de arquivos de lock --------------------------
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.7
+    hooks:
+      - id: uv-lock
