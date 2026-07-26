@@ -281,18 +281,3 @@ version_provider = "pep621"   # lê [project].version
 tag_format = "v$version"
 update_changelog_on_bump = true
 major_version_zero = true
-
-# =============================================================================
-# BUMPVER — versionamento semântico automático (roda no pre-commit)
-# =============================================================================
-[tool.bumpver]
-current_version = "1.0.0"
-version_pattern = "MAJOR.MINOR.PATCH"
-commit_message = "chore: Bump version {old_version} -> {new_version}"
-commit = true
-tag = true
-push = true
-pre_commit_hook = "pre-bump.sh"
-
-[tool.bumpver.file_patterns]
-"pyproject.toml" = ['version = "{version}"']
