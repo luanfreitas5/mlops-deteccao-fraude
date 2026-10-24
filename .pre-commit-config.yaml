@@ -1,12 +1,13 @@
 # =============================================================================
-# .pre-commit-config.yaml — apenas checagens RÁPIDAS, para não criar atrito no
-# commit. Type checking (basedPyright), segurança (bandit) e complexidade
-# (xenon/radon) rodam no CI, conforme o CLAUDE.md.
+# .pre-commit-config.yaml — apenas verificações RÁPIDAS (segundos, sobre os arquivos
+# em staging). Checagens pesadas (basedpyright, bandit, vulture, refurb, xenon,
+# interrogate, pip-audit e a suíte completa com cobertura) rodam no CI e em
+# `make check`: commits são locais e baratos de corrigir; o merge é o portão.
 #
 # Setup:
-#   uv run pre-commit install
-#   uv run pre-commit install --hook-type commit-msg   # ativa o commitizen
-#   uv run detect-secrets scan > .secrets.baseline      # gera o baseline
+#   make install      # uv sync + pre-commit install (pre-commit e commit-msg)
+#   uv run detect-secrets scan > .secrets.baseline   # gera o baseline
+#   uv run pre-commit autoupdate                      # reveja os `rev` periodicamente
 # =============================================================================
 
 default_install_hook_types: [pre-commit, commit-msg]
@@ -61,4 +62,5 @@ repos:
         entry: uv run pytest -m smoke -q --no-cov
         language: system
         pass_filenames: false
+        types: [python]
         stages: [pre-commit]

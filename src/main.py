@@ -48,6 +48,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=ModelName.XGBOOST.value,
         help="Modelo a treinar (padrão: xgboost).",
     )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default=None,
+        help="Sobrescreve o nível de log de configs/logging.yaml.",
+    )
     return parser
 
 
@@ -79,7 +85,7 @@ def run(stage: str, model_name: str, settings: Settings) -> None:
 def main() -> None:
     """Ponto de entrada da CLI: configura ambiente e despacha a etapa."""
     args = _build_parser().parse_args()
-    logger = configure_logging()
+    logger = configure_logging(level=args.log_level)
     settings = load_settings()
     seed_everything(settings.random_seed)
     logger.info("Iniciando etapa '%s' (modelo=%s)", args.stage, args.model)

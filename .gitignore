@@ -27,19 +27,20 @@ env/
 !.env.example
 # .secrets.baseline é commitado (usado pelo detect-secrets) — não ignorar.
 
-# --- Dados (versionados por DVC) -------------------------------------------
-data/raw/*
-data/external/*
-data/interim/*
-data/processed/*
-# Mantém a estrutura de pastas e os ponteiros do DVC:
-!data/**/.gitkeep
-!data/**/*.dvc
+# --- Dados (arquitetura medalhão; versionados por DVC) ----------------------
+# Ancorado na raiz: "data/" sem âncora também esconderia src/data/.
+/data/bronze/*
+/data/silver/*
+/data/gold/*
+# Mantém a estrutura de pastas, o manifesto do bronze e os ponteiros do DVC:
+!/data/**/.gitkeep
+!/data/**/*.dvc
+!/data/bronze/manifest.json
 
 # --- Modelos / experimentos ------------------------------------------------
-models/*
-!models/**/.gitkeep
-!models/**/*.dvc
+/models/*
+!/models/**/.gitkeep
+!/models/**/*.dvc
 mlruns/
 mlartifacts/
 *.joblib
@@ -48,10 +49,8 @@ mlartifacts/
 *.onnx
 *.h5
 
-# Relatórios gerados
-reports/figures/*
-!reports/figures/.gitkeep
-reports/*.json
+# Relatórios: métricas (reports/metrics/*.json) e figuras são COMMITADAS — o README
+# cita esses arquivos como fonte dos números. Apenas o monitoramento é ignorado.
 reports/monitoring/*
 
 

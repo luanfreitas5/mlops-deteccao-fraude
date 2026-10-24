@@ -46,7 +46,7 @@ def run_evaluation_pipeline() -> dict[str, object]:
     paths = get_paths()
     model_path = paths.models / "fraud_model.joblib"
     metadata_path = paths.models / "fraud_model.json"
-    test_path = paths.data_processed / "test.parquet"
+    test_path = paths.data_gold / "test.parquet"
 
     if not model_path.exists() or not test_path.exists():
         raise FileNotFoundError(
@@ -86,7 +86,8 @@ def run_evaluation_pipeline() -> dict[str, object]:
         "pr_auc_ci_95": list(result.pr_auc_ci),
         "threshold": threshold,
     }
-    test_metrics_path = paths.reports / "test_metrics.json"
+    test_metrics_path = paths.metrics / "test_metrics.json"
+    test_metrics_path.parent.mkdir(parents=True, exist_ok=True)
     with test_metrics_path.open("w", encoding="utf-8") as file:
         json.dump(summary, file, ensure_ascii=False, indent=2)
     logger.info("Métricas de teste salvas em %s", test_metrics_path)

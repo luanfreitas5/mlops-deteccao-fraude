@@ -30,7 +30,7 @@ def hash_file(path: Path, algorithm: str = "sha256") -> str:
 
     Examples
     --------
-    >>> digest = hash_file(Path("data/raw/creditcard.csv"))  # doctest: +SKIP
+    >>> digest = hash_file(Path("data/bronze/creditcard.csv"))  # doctest: +SKIP
     """
     path = Path(path)
     if not path.exists():

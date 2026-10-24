@@ -29,3 +29,9 @@ evaluation:
 business_cost:
   false_negative: 100.0   # custo de deixar passar uma fraude
   false_positive: 1.0     # custo de revisar/bloquear uma transação legítima
+
+# Rastreamento de experimentos (MLflow) — sempre com banco de dados, nunca ./mlruns (file store)
+experiment:
+  tracking_uri: "sqlite:///mlruns/mlflow.db"
+  experiment_name: null    # null -> usa project_name
+  allow_dirty: false       # recusa registrar runs com alterações Git não commitadas

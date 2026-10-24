@@ -15,10 +15,11 @@ pipeline
 from src.exceptions.base import FraudDetectionError
 from src.exceptions.data import DataValidationError, RawDataNotFoundError
 from src.exceptions.model import ModelNotFittedError, ModelNotFoundError
-from src.exceptions.pipeline import PipelineError
+from src.exceptions.pipeline import DirtyWorkingTreeError, PipelineError
 
 __all__ = [
     "DataValidationError",
+    "DirtyWorkingTreeError",
     "FraudDetectionError",
     "ModelNotFittedError",
     "ModelNotFoundError",

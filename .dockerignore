@@ -1,28 +1,13 @@
-# Contexto de build enxuto: exclui o que não é necessário à imagem.
-.venv/
-venv/
-__pycache__/
-*.py[cod]
-.git/
-.github/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.hypothesis/
-htmlcov/
-coverage.xml
-.coverage*
-data/
-notebooks/
-docs/
-site/
-reports/
-logs/
-mlruns/
-mlartifacts/
-tests/
-*.log
-.env
-.env.*
-!.env.example
-.DS_Store
+# Lista de permissão: ignora tudo e libera só o que a imagem precisa.
+# Assim .venv (do host), .env, data/, models/, mlruns/ e .git nunca entram no contexto.
+*
+!pyproject.toml
+!uv.lock
+!src/
+!app/
+!configs/
+!docker/
+
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache

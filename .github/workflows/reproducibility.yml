@@ -9,7 +9,7 @@
 #
 # Observação: o projeto ainda não tem DVC de fato configurado (não há
 # .dvc/ nem dvc.yaml no repo, embora o .gitignore já reserve espaço pra
-# isso) — o dataset Olist é baixado manualmente em data/raw. Quando o DVC
+# isso) — o dataset é baixado manualmente em data/bronze. Quando o DVC
 # for adotado, adicione aqui um job `dvc status`/`dvc repro --dry`.
 # =============================================================================
 name: Reproducibility
@@ -51,7 +51,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: "3.12"
 
-      - run: uv sync --dev
+      - run: uv sync --group notebooks
 
       - name: Checar se algum notebook tem output não removido
         run: uv run nbstripout notebooks/*

@@ -2,41 +2,48 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import mlflow
+import numpy as np
+import pandas as pd
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from src.experiment.tracker import MLflowTracker, _current_git_sha
+from src.exceptions.pipeline import DirtyWorkingTreeError
+from src.experiment.tracker import MLflowTracker, compute_git_sha
 
 
 @pytest.fixture
 def tracker(tmp_path: Path) -> MLflowTracker:
-    """Tracker MLflow apontando para um banco SQLite temporário (não polui o repo).
+    """Tracker MLflow com banco SQLite temporário (não polui o repositório).
 
-    O backend de arquivos (``file:./mlruns``) está em modo de manutenção nas
-    versões recentes do MLflow; SQLite é o backend local recomendado.
+    O backend de arquivos (``file:./mlruns``) está em modo de manutenção; o
+    SQLite é o backend local usado pelo projeto. ``allow_dirty`` evita que a
+    árvore Git de desenvolvimento (suja) impeça os testes.
     """
-    tracking_uri = f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}"
-    return MLflowTracker(experiment_name="teste-fraude", tracking_uri=tracking_uri)
+    tracking_uri = f"sqlite:///{(tmp_path / 'mlruns' / 'mlflow.db').as_posix()}"
+    return MLflowTracker(
+        experiment_name="teste-fraude", tracking_uri=tracking_uri, seed=7, allow_dirty=True
+    )
 
 
-def test_start_run_tags_git_sha_and_data_hash(tracker: MLflowTracker) -> None:
-    """O run iniciado recebe as tags git_sha e data_hash quando informado."""
+def test_start_run_tags_lineage_on_parent(tracker: MLflowTracker) -> None:
+    """O run pai recebe as tags git_sha, data_hash e seed."""
     with tracker.start_run(run_name="run-teste", data_hash="abc123") as run:
         run_id = run.info.run_id
-    finished = mlflow.get_run(run_id)
-    assert finished.data.tags["data_hash"] == "abc123"
-    assert "git_sha" in finished.data.tags
+    tags = mlflow.get_run(run_id).data.tags
+    assert tags["data_hash"] == "abc123"
+    assert tags["seed"] == "7"
+    assert "git_sha" in tags
 
 
 def test_start_run_without_data_hash_skips_tag(tracker: MLflowTracker) -> None:
     """Sem ``data_hash``, a tag correspondente não é registrada."""
     with tracker.start_run(run_name="run-sem-hash") as run:
         run_id = run.info.run_id
-    finished = mlflow.get_run(run_id)
-    assert "data_hash" not in finished.data.tags
+    assert "data_hash" not in mlflow.get_run(run_id).data.tags
 
 
 def test_log_params_metrics_and_artifact(tracker: MLflowTracker, tmp_path: Path) -> None:
@@ -55,36 +62,91 @@ def test_log_params_metrics_and_artifact(tracker: MLflowTracker, tmp_path: Path)
     assert finished.data.metrics["average_precision"] == 0.9
 
 
-def test_log_model_delegates_to_mlflow_sklearn(
+def test_log_cv_folds_creates_nested_child_run_per_fold(tracker: MLflowTracker) -> None:
+    """Cada fold vira um run filho com as tags de linhagem e a métrica do fold."""
+    with tracker.start_run(run_name="cv", data_hash="h") as parent:
+        tracker.log_cv_folds([0.7, 0.8, 0.9], "val_average_precision")
+        parent_id = parent.info.run_id
+
+    children = mlflow.search_runs(
+        experiment_names=["teste-fraude"],
+        filter_string=f"tags.mlflow.parentRunId = '{parent_id}'",
+        output_format="list",
+    )
+    assert sorted(child.data.metrics["val_average_precision"] for child in children) == [
+        0.7,
+        0.8,
+        0.9,
+    ]
+    assert all(child.data.tags["data_hash"] == "h" for child in children)
+    assert sorted(child.data.tags["fold"] for child in children) == ["0", "1", "2"]
+
+
+def test_log_model_passes_signature_and_input_example(
     tracker: MLflowTracker, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``log_model`` delega ao ``log_model`` do sabor sklearn do MLflow.
+    """``log_model`` registra o modelo com assinatura e exemplo de entrada.
 
-    A inferência real de ambiente/dependências do MLflow para modelos sklearn é
-    lenta demais para um teste unitário; aqui apenas garantimos que o wrapper
-    repassa o modelo e o caminho do artefato corretamente.
+    A serialização real do MLflow é lenta para um teste unitário; aqui garantimos
+    que o wrapper repassa assinatura, exemplo e formato corretamente.
     """
-    calls: list[tuple[object, str]] = []
+    calls: list[dict[str, object]] = []
     monkeypatch.setattr(
-        "src.experiment.tracker.log_sklearn_model",
-        lambda model, artifact_path: calls.append((model, artifact_path)),
+        mlflow.sklearn,
+        "log_model",
+        lambda model, **kwargs: calls.append({"model": model, **kwargs}),
     )
-    model = LogisticRegression().fit([[0], [1]], [0, 1])
+    x = pd.DataFrame({"a": np.linspace(0, 1, 20), "b": np.linspace(1, 0, 20)})
+    model = LogisticRegression().fit(x, [0, 1] * 10)
 
     with tracker.start_run(run_name="run-modelo"):
-        tracker.log_model(model, artifact_path="modelo")
+        tracker.log_model(model, x, name="modelo")
 
-    assert calls == [(model, "modelo")]
-
-
-def test_current_git_sha_returns_short_sha_in_repo() -> None:
-    """Dentro de um repositório Git, retorna um SHA curto não vazio."""
-    sha = _current_git_sha()
-    assert sha != "unknown"
-    assert len(sha) > 0
+    assert len(calls) == 1
+    assert calls[0]["model"] is model
+    assert calls[0]["name"] == "modelo"
+    assert calls[0]["signature"] is not None
+    assert len(calls[0]["input_example"]) == 5  # type: ignore[arg-type]
+    assert calls[0]["serialization_format"] == "cloudpickle"
 
 
-def test_current_git_sha_returns_unknown_when_git_unavailable(
+def test_tracker_creates_sqlite_parent_directory(tmp_path: Path) -> None:
+    """O diretório do arquivo SQLite é criado se não existir."""
+    db_path = tmp_path / "novo" / "mlflow.db"
+    MLflowTracker("exp", f"sqlite:///{db_path.as_posix()}", allow_dirty=True)
+    assert db_path.parent.is_dir()
+
+
+def _fake_git(status: str) -> object:
+    """Cria um substituto de ``subprocess.run`` com ``git status`` fixo."""
+
+    def _run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        out = status if cmd[1] == "status" else "a" * 40
+        return subprocess.CompletedProcess(cmd, 0, stdout=out + "\n", stderr="")
+
+    return _run
+
+
+def test_compute_git_sha_raises_on_dirty_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Com alterações não commitadas, o registro é recusado."""
+    monkeypatch.setattr("src.experiment.tracker.subprocess.run", _fake_git(" M src/main.py"))
+    with pytest.raises(DirtyWorkingTreeError):
+        compute_git_sha()
+
+
+def test_compute_git_sha_returns_full_sha_on_clean_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Árvore limpa retorna o SHA completo do HEAD."""
+    monkeypatch.setattr("src.experiment.tracker.subprocess.run", _fake_git(""))
+    assert compute_git_sha() == "a" * 40
+
+
+def test_compute_git_sha_allow_dirty_returns_sha(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``allow_dirty`` aceita árvore suja (apenas depuração local)."""
+    monkeypatch.setattr("src.experiment.tracker.subprocess.run", _fake_git(" M x.py"))
+    assert compute_git_sha(allow_dirty=True) == "a" * 40
+
+
+def test_compute_git_sha_returns_unknown_when_git_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Se o comando git não estiver disponível, retorna ``'unknown'``."""
@@ -93,4 +155,4 @@ def test_current_git_sha_returns_unknown_when_git_unavailable(
         raise FileNotFoundError
 
     monkeypatch.setattr("src.experiment.tracker.subprocess.run", _raise)
-    assert _current_git_sha() == "unknown"
+    assert compute_git_sha() == "unknown"

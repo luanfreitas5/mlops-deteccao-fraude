@@ -1,53 +1,50 @@
-# =============================================================================
-# Dockerfile — build multi-stage para a API de inferência (FastAPI).
-# Usa uv para instalação rápida e reprodutível; roda como usuário não-root.
-# =============================================================================
+# syntax=docker/dockerfile:1.7
+# Imagem da API de detecção de fraude: código + dependências travadas (uv.lock).
+# O modelo NÃO entra na imagem: é montado em /models (somente leitura) e localizado
+# pela variável MODEL_URI. Um novo modelo nunca exige uma nova imagem.
+# Tags fixadas por patch (mesma tag nos estágios); em produção acrescente @sha256:<digest>
+# (obtido com `docker buildx imagetools inspect <imagem>:<tag>`).
 
-# ---- Stage 1: builder -------------------------------------------------------
-FROM python:3.12-slim AS builder
+# ---------- Estágio 1: binário do uv, versão fixa ----------
+FROM ghcr.io/astral-sh/uv:0.8.15 AS uv
 
-# Instala o uv (gerenciador de pacotes).
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
+# ---------- Estágio 2: resolve o ambiente a partir do uv.lock ----------
+FROM python:3.12.11-slim-bookworm AS builder
+COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0
-
 WORKDIR /app
+# Só os manifestos: esta camada fica em cache até o lock mudar.
+# --locked falha se o uv.lock estiver desatualizado em relação ao pyproject.toml;
+# --no-dev deixa de fora ferramentas de desenvolvimento (grupos dev, quality, docs...).
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    uv sync --locked --no-dev --no-install-project
 
-# Copia manifestos primeiro para aproveitar o cache de camadas.
-COPY pyproject.toml uv.lock* ./
-
-# Instala apenas as dependências de runtime + extra 'api' (sem dev).
-RUN uv sync --no-dev --extra api --frozen --no-install-project || \
-    uv sync --no-dev --extra api --no-install-project
-
-# ---- Stage 2: runtime -------------------------------------------------------
-FROM python:3.12-slim AS runtime
-
-# Usuário não-root.
-RUN useradd --create-home --uid 1000 appuser
-
+# ---------- Estágio 3: runtime enxuto, sem uv, sem compiladores ----------
+FROM python:3.12.11-slim-bookworm AS runtime
+# libgomp1: runtime OpenMP exigido pelo xgboost; ausente na imagem slim.
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
-
-# Copia o ambiente virtual pronto do builder.
+# Código e venv pertencem ao root: o usuário da aplicação só lê.
 COPY --from=builder /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH" \
+COPY src/ src/
+COPY app/ app/
+COPY configs/ configs/
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONPATH="/app" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
-# Copia o código-fonte e artefatos necessários ao serving.
-COPY src ./src
-COPY app ./app
-COPY configs ./configs
-COPY models ./models
-
-USER appuser
-
+    PYTHONDONTWRITEBYTECODE=1 \
+    MODEL_URI="/models/fraud_model.joblib"
+USER app:app
 EXPOSE 8000
-
-# Healthcheck simples no endpoint /health.
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
-
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

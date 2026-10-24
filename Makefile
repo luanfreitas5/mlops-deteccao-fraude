@@ -1,175 +1,130 @@
-# --- Configuração ----------------------------------------------------------
-PYTHON := python
+# Atalhos reprodutíveis. `make check` replica o CI localmente.
+# Pipeline de dados em medalhão: bronze (data/bronze) -> silver -> gold -> modelo -> avaliação.
 UV := uv
-RUN := $(UV) run python src/main.py    # 'src' vira raiz do path ao rodar o script
+MODEL ?= xgboost
 
 .DEFAULT_GOAL := help
-.PHONY: help init venv install install-all install-models hooks pre-commit update-hooks update lock export \
-	check format lint typecheck security deadcode complexity docstrings refurb quality \
-	update-version test smoke hooks pre-commit update-hooks docs docs-serve docs-deploy profile clean cache jupyter notebook add remove tree \
-	clean-processed clean-reports clean-outputs clean-notebooks features train evaluate explain pipeline app
+.PHONY: help install hooks lint format typecheck security quality test smoke check \
+	data preprocess train evaluate pipeline reproduce serve mlflow \
+	docker-build docker-up docker-down docs docs-serve docs-deploy \
+	pre-commit update-hooks update lock export bump profile clean clean-gold clean-reports
 
 help:  ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-init:  ## Inicializa o projeto (instala dependências + hooks)
-	$(MAKE) install
-	$(MAKE) hooks
+# --- Ambiente ---------------------------------------------------------------
+install:  ## Instala todos os grupos de dependências e os hooks do pre-commit
+	$(UV) sync --all-groups
+	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
-venv:  ## Cria o ambiente virtual (requer: uv)
-	$(UV) venv
+hooks:  ## Reinstala os hooks do pre-commit
+	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
-install:  ## Instala dependências (runtime + dev)
-	$(UV) sync --dev
-
-install-all:  ## Instala tudo (todos os extras + dev)
-	$(UV) sync --all-extras --dev
-
-install-models:  ## Instala os extras dos modelos Hugging Face (torch + transformers)
-	$(UV) sync --extra models --dev
-
-update:  ## Atualiza todas as dependências e sincroniza
+update:  ## Atualiza o lock e sincroniza o ambiente
 	$(UV) lock --upgrade
 	$(UV) sync --all-groups
 
-lock:
+lock:  ## Gera/atualiza o uv.lock
 	$(UV) lock
 
-export:
-	$(UV) export --no-hashes -o requirements.txt
+export:  ## Exporta requirements.txt a partir do lock (apenas runtime)
+	$(UV) export --locked --no-dev --no-hashes -o requirements.txt
 
-# --- Qualidade -------------------------------------------------------------
-check:  ## Checa formatação com ruff
+# --- Qualidade ---------------------------------------------------------------
+lint:  ## Lint e verificação de formatação (ruff)
 	$(UV) run ruff check .
+	$(UV) run ruff format --check .
 
-format:  ## Formata o código com ruff
-	$(UV) run ruff format .
-
-lint: ## Lint com ruff
+format:  ## Corrige lint e formata o código (ruff)
 	$(UV) run ruff check --fix .
+	$(UV) run ruff format .
 
 typecheck:  ## Type checking estático (basedPyright)
 	$(UV) run basedpyright
 
-security:  ## Análise de segurança (bandit + pip-audit)
-	$(UV) run bandit -r src -c pyproject.toml
+security:  ## Segurança do código e das dependências (bandit + pip-audit)
+	$(UV) run bandit -c pyproject.toml -r src
 	$(UV) run pip-audit
 
-deadcode:  ## Detecta código morto (vulture)
-	$(UV) run vulture src
-
-complexity:  ## Limites de complexidade (xenon)
+quality:  ## Código morto, modernização, complexidade e docstrings
+	$(UV) run vulture
+	$(UV) run refurb src
 	$(UV) run xenon --max-absolute B --max-modules A --max-average A src
-
-docstrings:  ## Cobertura de docstrings (interrogate)
 	$(UV) run interrogate -v src
 
-refurb:  ## Detecta código redundante (refurb)
-	$(UV) run refurb src
+test:  ## Testes com cobertura (mínimo 80%)
+	$(UV) run pytest -m "not slow" --cov --cov-report=term-missing --cov-report=xml
 
-quality: format lint typecheck security deadcode complexity docstrings refurb   ## Roda toda a suíte de qualidade (espelha o CI)
+smoke:  ## Smoke tests (os mesmos do pre-commit)
+	$(UV) run pytest -m smoke -q --no-cov
 
-# --- Testes ----------------------------------------------------------------
-test:  ## Roda os testes com cobertura
-	$(UV) run pytest -m "not slow"
-
-smoke:  ## Roda apenas os smoke tests
-	$(UV) run pytest -m smoke -q
-
-hooks:  ## Instala os hooks do pre-commit
-	$(UV) run pre-commit install
-	$(UV) run pre-commit install --hook-type commit-msg
-	# $(UV) run detect-secrets scan | Out-File -Encoding utf8 .secrets.baseline
+check: lint typecheck security quality test  ## Replica o CI completo localmente
 
 pre-commit:  ## Roda todos os hooks do pre-commit em todos os arquivos
 	$(UV) run pre-commit run --all-files
 
-update-hooks:  ## Atualiza os hooks do pre-commit
+update-hooks:  ## Atualiza as versões dos hooks do pre-commit
 	$(UV) run pre-commit autoupdate
-	$(UV) run pre-commit run --all-files
 
-update-version:
-	$(UV) add --dev commitizen
-	$(UV) run cz changelog
+bump:  ## Incrementa a versão (SemVer) e atualiza o CHANGELOG (commitizen)
 	$(UV) run cz bump --changelog --yes
 
-# --- Limpeza de saídas do pipeline ------------------------------------------
-clean-processed:  ## Remove os artefatos de dados processados
-	rm -rf data/processed/*.parquet
-
-clean-reports:  ## Remove os relatórios gerados (pastas por modelo + comparação)
-	find reports -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
-
-clean-outputs: clean-processed clean-reports  ## Remove todas as saídas do pipeline
-
-clean-notebooks:  ## Remove os notebooks com células vazias
-	$(UV) run nbstripout notebooks
-
-# --- Documentação ----------------------------------------------------------
-docs:  ## Constrói a documentação (modo estrito)
-	$(UV) run mkdocs build --strict
-
-docs-serve:  ## Servidor local da documentação
-	$(UV) run mkdocs serve
-
-docs-deploy:  ## Publica a documentação no GitHub Pages
-	$(UV) run mkdocs gh-deploy --force
-
-# --- Utilitários -----------------------------------------------------------
-profile:  ## Exemplo de profiling com scalene (ajuste o alvo)
-	$(UV) run scalene src/main.py
-
-clean:  ## Remove caches e artefatos temporários
-	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov coverage.xml site
-	find . -type d -name __pycache__ -exec rm -rf {} +
-
-cache:
-	$(UV) cache clean
-
-# --- Jupyter ----------------------------------------------------------------
-jupyter:
-	$(UV) run jupyter lab
-
-notebook:
-	$(UV) run jupyter notebook
-
-# --- Gerenciamento de pacotes -----------------------------------------------
-add:
-	$(UV) add $(PKG)
-
-remove:
-	$(UV) remove $(PKG)
-
-tree:
-	$(UV) tree
-
-# --- Pipeline de ML --------------------------------------------------------
-preprocess:  ## Carrega, limpa, divide e persiste os dados (raw -> processed)
+# --- Pipeline de ML ----------------------------------------------------------
+data:  ## Bronze -> silver -> gold (valida, deduplica e divide)
 	$(UV) run python -m src.main preprocess
 
-train:  ## Treina o modelo, otimiza o threshold e salva artefatos/métricas
-	$(UV) run python -m src.main train --model xgboost
+preprocess: data  ## Alias de `data`
 
-evaluate:  ## Avalia o modelo no conjunto de teste e gera figuras/relatórios
+train:  ## Treina (CV + modelo final), escolhe o threshold e registra no MLflow
+	$(UV) run python -m src.main train --model $(MODEL)
+
+evaluate:  ## Avalia no teste e gera figuras e reports/metrics/test_metrics.json
 	$(UV) run python -m src.main evaluate
 
-pipeline:  ## Executa o fluxo completo (preprocess -> train -> evaluate)
-	$(UV) run python -m src.main all --model xgboost
+pipeline:  ## Fluxo completo: data -> train -> evaluate
+	$(UV) run python -m src.main all --model $(MODEL)
 
-# --- Serving / MLflow ------------------------------------------------------
-serve:  ## Sobe a API de inferência (FastAPI + uvicorn)
-	$(UV) run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+reproduce:  ## Reexecuta apenas os estágios afetados (requer DVC instalado)
+	dvc repro
 
-mlflow:  ## Sobe a UI do MLflow apontando para ./mlruns
-	$(UV) run mlflow ui --backend-store-uri file:./mlruns
+# --- Serving e MLflow --------------------------------------------------------
+serve:  ## Sobe a API de inferência (FastAPI + uvicorn) em http://localhost:8000/docs
+	$(UV) run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
-# --- Docker ----------------------------------------------------------------
-docker-build:  ## Constrói a imagem da API
-	docker build -t mlops-deteccao-fraude:latest .
+mlflow:  ## UI do MLflow com backend SQLite em http://localhost:5000
+	$(UV) run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
 
-docker-up:  ## Sobe os serviços (API + MLflow) via docker-compose
-	docker compose up -d
+# --- Docker ------------------------------------------------------------------
+docker-build:  ## Constrói a imagem da API (sem o modelo: ele é montado em runtime)
+	docker build -t mlops-deteccao-fraude:dev .
+
+docker-up:  ## Sobe API + MLflow + Postgres (requer .env com POSTGRES_USER/PASSWORD)
+	docker compose up -d --build
 
 docker-down:  ## Derruba os serviços
 	docker compose down
+
+# --- Documentação ------------------------------------------------------------
+docs:  ## Constrói a documentação em modo estrito
+	$(UV) run --group docs mkdocs build --strict
+
+docs-serve:  ## Servidor local da documentação
+	$(UV) run --group docs mkdocs serve
+
+docs-deploy:  ## Publica a documentação no GitHub Pages
+	$(UV) run --group docs mkdocs gh-deploy --force
+
+# --- Utilitários -------------------------------------------------------------
+profile:  ## Profiling com scalene (meça antes de otimizar)
+	$(UV) run --group profiling scalene src/main.py
+
+clean:  ## Remove caches e artefatos temporários
+	rm -rf .pytest_cache .ruff_cache .mypy_cache .hypothesis htmlcov coverage.xml .coverage site
+	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} +
+
+clean-gold:  ## Remove as camadas silver e gold (o bronze é imutável e nunca é apagado)
+	rm -f data/silver/*.parquet data/gold/*.parquet
+
+clean-reports:  ## Remove figuras e métricas geradas
+	rm -f reports/figures/*.png reports/figures/*.svg reports/metrics/*.json

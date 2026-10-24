@@ -1,35 +1,69 @@
 # =============================================================================
-# docker-compose.yml — orquestra a API de inferência e o servidor MLflow.
+# docker-compose.yml — API de inferência + MLflow (tracking e registry) + Postgres.
+# Segredos vêm do .env (nunca commitado); `docker compose config -q` valida o arquivo.
+# O modelo é montado de ./models (somente leitura); nunca é embutido na imagem.
 # =============================================================================
 services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: mlops-deteccao-fraude:latest
-    container_name: fraude-api
-    ports:
-      - "8000:8000"
+  db:
+    image: postgres:16.4-bookworm
     environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: mlflow
     volumes:
-      - ./models:/app/models:ro
-    depends_on:
-      - mlflow
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d mlflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:latest
-    container_name: fraude-mlflow
-    ports:
-      - "5000:5000"
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri /mlruns
-      --default-artifact-root /mlartifacts
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/mlflow
+      - --artifacts-destination=/mlartifacts
+      - --serve-artifacts
+      # MLflow >= 3.5 valida o Host: inclua o nome do serviço ou chamadas entre contêineres recebem 403
+      # - --allowed-hosts=mlflow:5000,localhost:5000
     volumes:
-      - ./mlruns:/mlruns
-      - ./mlartifacts:/mlartifacts
+      - mlartifacts:/mlartifacts
+    ports:
+      - "127.0.0.1:5000:5000" # só na máquina local; o MLflow não tem autenticação por padrão
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
+
+  api:
+    build: .
+    image: mlops-deteccao-fraude:${API_VERSION:-dev}
+    environment:
+      MODEL_URI: ${MODEL_URI:-/models/fraud_model.joblib}
+    volumes:
+      - ./models:/models:ro # modelo fora da imagem, somente leitura
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: true # sistema de arquivos imutável; /tmp e logs em memória
+    tmpfs:
+      - /tmp
+      - /app/logs:uid=10001,gid=10001
+    # Com MODEL_URI apontando para um arquivo montado, a API não espera o MLflow.
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mlartifacts:

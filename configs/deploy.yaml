@@ -6,9 +6,10 @@ api:
   version: "0.1.0"
   host: "0.0.0.0"            # noqa: interface de bind dentro do container
   port: 8000
-  # Threshold de decisão em produção. Deve refletir o valor otimizado na
-  # avaliação (reports/metrics.json -> best_threshold) e ser versionado junto
+  # Threshold de decisão em produção. Deve refletir o valor otimizado no treino
+  # (reports/metrics/train_metrics.json -> best_threshold) e ser versionado junto
   # ao modelo. Requisições >= threshold são classificadas como fraude.
   decision_threshold: 0.5
+  # A variável de ambiente MODEL_URI (ver .env.example) tem precedência sobre model_path.
+  # O modelo nunca é embutido na imagem Docker: é montado como volume somente leitura.
   model_path: "models/fraud_model.joblib"
-  preprocessor_path: "models/preprocessor.joblib"

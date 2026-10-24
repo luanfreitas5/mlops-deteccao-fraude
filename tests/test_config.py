@@ -11,31 +11,32 @@ from src.config.settings import Settings, _read_yaml, load_settings
 def test_get_paths_returns_default_project_paths() -> None:
     """``get_paths`` retorna os caminhos canônicos do projeto."""
     paths = get_paths()
-    assert paths.data_raw.name == "creditcard.csv"
+    assert paths.data_bronze.name == "creditcard.csv"
     assert paths.configs.name == "configs"
 
 
 def test_project_paths_ensure_dirs_creates_output_directories(tmp_path: Path) -> None:
-    """``ensure_dirs`` cria os diretórios de saída, exceto os de dados brutos."""
+    """``ensure_dirs`` cria os diretórios de saída, exceto a camada bronze."""
     paths = ProjectPaths(
         root=tmp_path,
         configs=tmp_path / "configs",
-        data_raw=tmp_path / "data" / "raw" / "creditcard.csv",
-        data_interim=tmp_path / "data" / "interim",
-        data_processed=tmp_path / "data" / "processed",
+        data_bronze=tmp_path / "data" / "bronze" / "creditcard.csv",
+        data_silver=tmp_path / "data" / "silver",
+        data_gold=tmp_path / "data" / "gold",
         models=tmp_path / "models",
         reports=tmp_path / "reports",
         figures=tmp_path / "reports" / "figures",
+        metrics=tmp_path / "reports" / "metrics",
         logs=tmp_path / "logs",
     )
     paths.ensure_dirs()
-    assert paths.data_interim.is_dir()
-    assert paths.data_processed.is_dir()
+    assert paths.data_silver.is_dir()
+    assert paths.data_gold.is_dir()
     assert paths.models.is_dir()
     assert paths.reports.is_dir()
     assert paths.figures.is_dir()
     assert paths.logs.is_dir()
-    assert not paths.data_raw.parent.exists()  # dados brutos nunca são criados
+    assert not paths.data_bronze.parent.exists()  # camada bronze nunca é criada
 
 
 def test_read_yaml_returns_empty_dict_when_file_missing(tmp_path: Path) -> None:

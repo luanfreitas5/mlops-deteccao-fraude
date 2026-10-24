@@ -3,8 +3,8 @@
 ## Pipeline de ML
 
 ```bash
-make preprocess   # raw -> processed (limpeza, divisão, Parquet)
-make train        # treina, otimiza o threshold, salva modelo + métricas
+make data         # bronze -> silver -> gold (validação, limpeza, divisão, Parquet)
+make train        # CV + treino, otimiza o threshold, salva modelo + métricas, registra no MLflow
 make evaluate     # avalia no teste, gera figuras e relatórios
 make pipeline     # executa tudo de ponta a ponta
 ```
@@ -38,5 +38,5 @@ curl -X POST http://localhost:8000/predict \
 ## MLflow
 
 ```bash
-make mlflow       # UI em http://localhost:5000
+make mlflow       # UI em http://localhost:5000 (backend SQLite: mlruns/mlflow.db)
 ```

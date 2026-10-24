@@ -53,6 +53,18 @@ class BusinessCostConfig(BaseModel):
     false_positive: float = Field(gt=0, default=1.0)
 
 
+class ExperimentConfig(BaseModel):
+    """Configuração do rastreamento de experimentos (MLflow).
+
+    O backend é sempre um banco de dados (SQLite por padrão); o backend de
+    arquivos (``./mlruns``) está em modo de manutenção no MLflow.
+    """
+
+    tracking_uri: str = "sqlite:///mlruns/mlflow.db"
+    experiment_name: str | None = None  # None -> usa project_name
+    allow_dirty: bool = False  # True apenas para depuração local: o SHA deixa de ser confiável
+
+
 class LogisticRegressionParams(BaseModel):
     """Hiperparâmetros do baseline de Regressão Logística."""
 
@@ -101,6 +113,8 @@ class Settings(BaseSettings):
         Configuração de avaliação.
     business_cost : BusinessCostConfig
         Custos de negócio para o threshold.
+    experiment : ExperimentConfig
+        Rastreamento de experimentos (MLflow).
     model : ModelParams
         Hiperparâmetros dos modelos.
     """
@@ -118,6 +132,7 @@ class Settings(BaseSettings):
     imbalance: ImbalanceConfig = ImbalanceConfig()
     evaluation: EvaluationConfig = EvaluationConfig()
     business_cost: BusinessCostConfig = BusinessCostConfig()
+    experiment: ExperimentConfig = ExperimentConfig()
     model: ModelParams = ModelParams()
 
 

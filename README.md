@@ -1,143 +1,108 @@
-# 🛡️ MLOps — Detecção de Fraude em Cartão de Crédito
+# 🛡️ Detecção de Fraude com Pipeline MLOps Completo: PR-AUC 0,82 com IC 95% em dados com 0,17% de fraudes
 
 [![CI](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/ci.yml/badge.svg)](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/ci.yml)
-[![Tests](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/tests.yml/badge.svg)](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/tests.yml)
-[![Docs](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/docs.yml/badge.svg)](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/docs.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![codecov](https://codecov.io/gh/luanfreitas5/mlops-deteccao-fraude/graph/badge.svg)](https://codecov.io/gh/luanfreitas5/mlops-deteccao-fraude)
+[![docs](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/docs.yml/badge.svg)](https://luanfreitas5.github.io/mlops-deteccao-fraude/)
+[![License](https://img.shields.io/github/license/luanfreitas5/mlops-deteccao-fraude)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue) <!-- = matriz do CI (tests.yml) -->
 
-> Classificação em dados **fortemente desbalanceados** empacotada como **sistema de
-> produção**: API de inferência, versionamento de dados/modelos, rastreamento de
-> experimentos e CI/CD. É o projeto que prova **engenharia**, não só notebook.
-
----
+> **Resultado:** o XGBoost atinge PR-AUC = **0,815 (IC 95%: 0,732–0,892)** no teste (≈ 56,7 mil transações, ≈ 95 fraudes) do dataset *Credit Card Fraud* (ULB), com recall de 0,81 e precisão de 0,73 no limiar escolhido por custo. A comparação com o baseline (Regressão Logística) **ainda não foi medida** — ver [Resultados](#-resultados). O projeto empacota o modelo como sistema: dados em camadas, API, rastreamento de experimentos e CI/CD.
 
 ## 🎯 Problema
 
-Detectar transações fraudulentas em ~284 mil transações de cartão de crédito
-anonimizadas, com **~0,17% de fraudes**. O desbalanceamento extremo é o coração
-do desafio — e a razão de a **métrica principal ser a PR-AUC** (*Average
-Precision*), não a acurácia nem a ROC-AUC.
+- **Quem decide o quê:** o time antifraude decide quais transações enviar para revisão humana; o modelo entrega um score de risco e uma decisão limiarizada via API.
+- **Custo dos erros:** um falso negativo (fraude não detectada) custa muito mais que um falso positivo (revisão de transação legítima). Hipótese de projeto: **FN = 100 × FP** (`business_cost` em [`configs/config.yaml`](configs/config.yaml)). → **métrica principal: PR-AUC**, porque com 0,17% de positivos a ROC-AUC é otimista; o limiar de decisão minimiza o custo esperado, não é fixado em 0,5.
+- **Unidade de predição e momento `t0`:** uma linha por transação; as features usam apenas a própria transação (`V1`–`V28`, `Amount`, `Amount_log`, `Hour`), sem histórico futuro.
 
-| | |
+## 🗂️ Dados
+
+| Item | Valor |
 |---|---|
-| **Domínio** | Finanças / detecção de fraude |
-| **Alvo** | `Class` — binário (1 = fraude, 0 = legítima) |
-| **Métrica principal** | **PR-AUC** (foca na classe positiva sob desbalanceamento extremo) |
-| **Complementares** | ROC-AUC, recall/precision, Brier (calibração) |
-| **Modelo** | XGBoost (`scale_pos_weight`); baseline Regressão Logística; SMOTE opcional |
-| **Threshold** | Otimizado por **custo de negócio** (FN ≫ FP), não fixo em 0,5 |
-| **Deploy** | API **FastAPI** com validação de schema (anti train–serve skew) |
-| **Dados** | [Credit Card Fraud (ULB)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud) |
+| Fonte e licença | [Credit Card Fraud (ULB/Kaggle)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud) — Database Contents License (DbCL) |
+| Tamanho / período | 284.807 transações (283.726 após remover duplicatas), 2 dias de setembro de 2013 |
+| Alvo e prevalência | `Class` (1 = fraude), ≈ 0,17% positivos (492 fraudes) |
+| Documentação | [Datasheet](reports/datasheets/creditcard.md) |
 
----
+Os dados seguem a **arquitetura medalhão** (pastas fora do Git, versionadas por DVC):
 
-## 🧱 Stack
+| Camada | Pasta | Conteúdo |
+|---|---|---|
+| 🥉 Bronze | `data/bronze/` | CSV como recebido (imutável) + `manifest.json` com o SHA-256 |
+| 🥈 Silver | `data/silver/` | `transactions.parquet`: validado (pandera) e deduplicado |
+| 🥇 Gold | `data/gold/` | `train/val/test.parquet` (estratificado 60/20/20, semente 42) |
 
-`Python` · `Polars` · `scikit-learn` · `XGBoost` · `imbalanced-learn` ·
-`pandera` · `Pydantic` · `FastAPI` · `MLflow` · `DVC` · `Docker` ·
-`GitHub Actions` · `pytest` · `MkDocs`
+## 📊 Resultados
 
----
+Protocolo: divisão estratificada 60/20/20 (semente 42); limiar escolhido na **validação** por custo esperado; métricas finais no **teste**, que não participa do ajuste nem do limiar. IC 95% da PR-AUC por bootstrap (1000 reamostragens).
 
-## 📂 Estrutura
+| Modelo | PR-AUC (IC 95%) | ROC-AUC | Recall | Precisão | F1 | Brier |
+|---|---|---|---|---|---|---|
+| Baseline: Regressão Logística (`class_weight="balanced"`) | *não medido* | — | — | — | — | — |
+| **XGBoost** (`scale_pos_weight`) | **0,815 (0,732–0,892)** | 0,968 | 0,811 | 0,726 | 0,766 | 0,0004 |
 
-```text
-├── app/               # API FastAPI (inferência)
-├── configs/           # YAML validados por Pydantic
-├── data/              # raw / interim / processed (versionados por DVC)
-├── docs/              # MkDocs Material
-├── notebooks/         # EDA (exploração)
-├── reports/           # figuras, model cards, datasheets, métricas
-├── src/
-│   ├── config/        # settings, paths, logging, seeds
-│   ├── constants/     # colunas, rótulos, métricas
-│   ├── schemas/       # contrato pandera + schemas da API
-│   ├── data/          # loader, splitter, writer
-│   ├── preprocessing/ # limpeza + pré-processador sklearn
-│   ├── features/      # engenharia de features
-│   ├── models/        # fábrica + persistência
-│   ├── training/      # trainer + validação cruzada
-│   ├── evaluation/    # métricas, threshold, avaliador (IC bootstrap)
-│   ├── inference/     # preditor (consistente com o treino)
-│   ├── experiment/    # tracker MLflow
-│   ├── pipelines/     # orquestração ponta a ponta
-│   ├── visualization/ # tema + figuras
-│   └── main.py        # CLI (preprocess | train | evaluate | all)
-└── tests/             # unit, property-based, comportamentais, API
-```
+- **Diferença vs baseline:** não pode ser afirmada — o baseline ainda não foi treinado com o mesmo protocolo e não há teste de significância (McNemar / *t* corrigido). Rodar `make train MODEL=logistic_regression` sobrescreve o modelo salvo, então a comparação pede salvar os artefatos por modelo (pendente).
+- **Validação (usada para o limiar):** PR-AUC 0,889 (0,823–0,942), recall 0,894. Os ICs são largos porque há poucas dezenas de fraudes por partição.
+- **Limiar de decisão:** 0,0402 (custo esperado na validação = 1028).
+- **Pior segmento:** não avaliado — o dataset não tem atributos demográficos (V1–V28 são PCA) e a análise por faixa de `Amount` está pendente (ver [Model Card](reports/model_cards/fraud_xgboost_v0.3.0.md)).
 
----
+| Curva Precisão–Recall | Matriz de confusão (teste) |
+|---|---|
+| ![Curva Precisão-Recall do XGBoost no teste](reports/figures/pr_curve.png) | ![Matriz de confusão no teste, limiar 0,0402](reports/figures/confusion_matrix.png) |
 
-## 🚀 Início rápido
+## 🔁 Reproduzir
+
+Requisitos: [uv](https://docs.astral.sh/uv/), `make`, Git e o CSV do dataset em `data/bronze/creditcard.csv` (download manual no Kaggle; fora do Git). O treino registra no MLflow e **recusa árvore Git com alterações não commitadas** (veja `experiment.allow_dirty` em [`configs/config.yaml`](configs/config.yaml)). Tempo de execução: não medido.
 
 ```bash
-# 1. Dependências (uv)
-make install
-uv sync --dev --extra api
-
-# 2. Coloque o dataset em data/raw/creditcard.csv
-
-# 3. Pipeline completo: raw -> processed -> modelo -> avaliação
-make pipeline
-
-# 4. Suba a API de inferência
-make serve      # http://localhost:8000/docs
+git clone https://github.com/luanfreitas5/mlops-deteccao-fraude.git
+cd mlops-deteccao-fraude
+# coloque o creditcard.csv em data/bronze/
 ```
 
-### Comandos úteis
+<!-- verify:start -->
+```bash
+uv sync --locked
+make data train evaluate
+```
+<!-- verify:end -->
+
+Os números de Resultados vêm de [`reports/metrics/test_metrics.json`](reports/metrics/test_metrics.json) (teste) e [`reports/metrics/train_metrics.json`](reports/metrics/train_metrics.json) (validação, limiar e linhagem). Esses arquivos foram gerados em Python 3.14 local, antes da validação cruzada e do MLflow reestruturado; `TODO`: republicar com o `uv.lock` do commit atual e registrar o SHA aqui.
+
+Outros comandos úteis (`make help` lista todos):
 
 | Comando | Descrição |
 |---|---|
-| `make preprocess` | Carrega, valida, limpa, divide e persiste os dados |
-| `make train` | Treina, otimiza o threshold e salva modelo + métricas |
-| `make evaluate` | Avalia no teste e gera figuras/relatórios |
-| `make quality` | Espelha o CI (lint, tipos, segurança, complexidade, docstrings) |
-| `make test` | Testes com cobertura (≥ 80%) |
-| `make mlflow` | UI do MLflow (`http://localhost:5000`) |
-| `make docker-up` | Sobe API + MLflow via docker-compose |
+| `make install` | Instala todos os grupos de dependências e os hooks do pre-commit |
+| `make serve` | API de inferência em `http://localhost:8000/docs` |
+| `make mlflow` | UI do MLflow (SQLite) em `http://localhost:5000` |
+| `make check` | Replica o CI localmente (lint, tipos, segurança, qualidade, testes ≥ 80%) |
+| `make docker-up` | API + MLflow + Postgres via Docker Compose (o modelo é montado, não embutido) |
+| `make reproduce` | Reexecuta só os estágios afetados do pipeline (DVC) |
 
----
+## 🧱 Estrutura
 
-## 🧪 Decisões de engenharia (senior bar)
-
-- **PR-AUC como métrica principal:** com 0,17% de positivos, a ROC-AUC é otimista
-  demais; a PR-AUC reflete o desempenho sobre a fraude.
-- **Incerteza sempre:** toda métrica principal vem com **IC 95%** (bootstrap), nunca
-  um ponto isolado.
-- **Threshold por custo de negócio:** o corte é escolhido minimizando o custo
-  esperado (FN ≫ FP), não fixado em 0,5.
-- **Validação de dados (pandera):** contrato aplicado nas fronteiras do pipeline e
-  em cada requisição da API — falha cedo, não corrompe em silêncio.
-- **Consistência treino–serving:** a mesma `prepare_xy` gera features no treino e no
-  serving; SMOTE só no ajuste (dentro de `imblearn.Pipeline`), nunca vaza.
-- **Reprodutibilidade:** seeds fixadas, hash SHA-256 dos dados e linhagem no MLflow
-  (Git SHA + hash do dataset).
-
----
-
-## 📊 Reprodutibilidade com DVC
-
-```bash
-dvc repro        # reexecuta só os estágios afetados (preprocess -> train -> evaluate)
+```text
+├── app/               # API FastAPI (/health, /predict) com validação de schema
+├── configs/           # YAML validados por Pydantic (config, paths, logging, modelo, deploy)
+├── data/              # bronze / silver / gold (fora do Git; DVC)
+├── docker/            # Dockerfile do servidor MLflow
+├── notebooks/         # EDA (exploração; sem lógica de produção)
+├── reports/           # métricas (JSON), figuras, Model Card e Datasheet
+├── src/               # código por funcionalidade: data, features, training, evaluation, inference, experiment...
+└── tests/             # unitários, property-based, comportamentais e de API
 ```
 
----
+Decisões que justificam as ferramentas: **pandera** valida o contrato em cada fronteira (bronze→silver→gold e requisições da API) para falhar cedo; **MLflow com SQLite** registra cada run com `git_sha`, `data_hash` e `seed`, um run filho por fold e o modelo com assinatura; **uma única função** (`prepare_xy`) gera as features no treino e no serving, evitando *train-serve skew*; **SMOTE**, quando usado, fica dentro de um `imblearn.Pipeline` e só atua no ajuste.
 
-## 📖 Documentação
+## ⚠️ Limitações
 
-Guias e referência de API (gerada das docstrings) em MkDocs Material:
+- Apenas 2 dias de dados de 2013 e só cartões europeus: **sem validação externa nem temporal**; a divisão é aleatória, o que tende a ser otimista frente a um cenário prospectivo.
+- ≈ 95 fraudes no teste: o IC da PR-AUC é largo (0,73–0,89); diferenças menores que isso não são conclusivas.
+- Baseline, teste de significância, análise por fatias e curva de calibração **pendentes** (listados como `TODO` no Model Card).
+- As features são PCA anonimizadas: sem auditoria de fairness e com interpretabilidade limitada.
+- Os custos FN/FP são hipóteses de projeto; o limiar deve ser recalibrado com custos reais.
+- Sem monitoramento de deriva implantado (plano descrito no Model Card).
 
-```bash
-make docs-serve  # http://127.0.0.1:8000
-```
+## 📄 Licença e citação
 
-Veja também o [Model Card](reports/model_cards/fraud_xgboost_model_card.md) e o
-[Datasheet](reports/datasheets/creditcard_datasheet.md).
-
----
-
-## 📝 Licença
-
-Distribuído sob a licença [MIT](LICENSE).
+MIT — ver [LICENSE](LICENSE). Documentação completa (guias e API gerada das docstrings): [site MkDocs](https://luanfreitas5.github.io/mlops-deteccao-fraude/).

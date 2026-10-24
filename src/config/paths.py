@@ -3,6 +3,9 @@
 Todos os caminhos derivam da raiz do repositório, resolvida a partir da
 localização deste arquivo. Nunca use strings de caminho hardcoded no código;
 importe :func:`get_paths` ou :class:`ProjectPaths`.
+
+Os dados seguem a arquitetura medalhão: ``bronze`` (como recebido, imutável),
+``silver`` (limpo, tipado e validado) e ``gold`` (pronto para modelagem).
 """
 
 from __future__ import annotations
@@ -24,39 +27,47 @@ class ProjectPaths:
         Raiz do repositório.
     configs : Path
         Diretório de arquivos YAML de configuração.
-    data_raw : Path
-        Caminho do CSV bruto de transações (nunca modificado).
-    data_processed : Path
-        Diretório com os dados prontos para modelagem.
+    data_bronze : Path
+        Caminho do CSV bruto de transações, exatamente como recebido (imutável).
+    data_silver : Path
+        Diretório dos dados limpos, tipados, deduplicados e validados.
+    data_gold : Path
+        Diretório dos dados prontos para modelagem (partições treino/validação/teste).
     models : Path
         Diretório de modelos e artefatos serializados.
     reports : Path
         Diretório de relatórios, figuras e métricas.
+    figures : Path
+        Diretório das figuras de avaliação.
+    metrics : Path
+        Diretório dos JSONs de métricas (versionados no Git).
     logs : Path
         Diretório de logs com rotação diária.
     """
 
     root: Path = ROOT
     configs: Path = ROOT / "configs"
-    data_raw: Path = ROOT / "data" / "raw" / "creditcard.csv"
-    data_interim: Path = ROOT / "data" / "interim"
-    data_processed: Path = ROOT / "data" / "processed"
+    data_bronze: Path = ROOT / "data" / "bronze" / "creditcard.csv"
+    data_silver: Path = ROOT / "data" / "silver"
+    data_gold: Path = ROOT / "data" / "gold"
     models: Path = ROOT / "models"
     reports: Path = ROOT / "reports"
     figures: Path = ROOT / "reports" / "figures"
+    metrics: Path = ROOT / "reports" / "metrics"
     logs: Path = ROOT / "logs"
 
     def ensure_dirs(self) -> None:
         """Cria os diretórios de saída caso ainda não existam.
 
-        Diretórios de dados brutos não são criados — devem preexistir.
+        A camada bronze não é criada — o dado bruto deve preexistir.
         """
         for directory in (
-            self.data_interim,
-            self.data_processed,
+            self.data_silver,
+            self.data_gold,
             self.models,
             self.reports,
             self.figures,
+            self.metrics,
             self.logs,
         ):
             directory.mkdir(parents=True, exist_ok=True)
@@ -73,7 +84,7 @@ def get_paths() -> ProjectPaths:
     Examples
     --------
     >>> paths = get_paths()
-    >>> paths.data_raw.name
+    >>> paths.data_bronze.name
     'creditcard.csv'
     """
     return ProjectPaths()

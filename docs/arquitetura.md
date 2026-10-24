@@ -31,3 +31,24 @@ acoplamento), nunca por um pacote nomeado pelo projeto.
 - **Desbalanceamento:** `scale_pos_weight` como padrão (rápido, sem sintetizar
   dados); SMOTE dentro de um `imblearn.Pipeline` (aplicado só no ajuste) como
   alternativa comparável.
+
+## Camadas de dados (medalhão)
+
+| Camada | Pasta | Conteúdo | Regra |
+|---|---|---|---|
+| Bronze | `data/bronze/` | CSV original + `manifest.json` (SHA-256) | Imutável: nunca é modificada. |
+| Silver | `data/silver/` | `transactions.parquet`: validado (pandera) e deduplicado | Gerada a partir do bronze. |
+| Gold | `data/gold/` | `train/val/test.parquet` prontos para modelagem | Gerada a partir do silver. |
+
+## Rastreamento de experimentos
+
+Cada treino abre um run pai no MLflow (backend SQLite em `mlruns/mlflow.db`) com as
+tags `git_sha`, `data_hash` e `seed`, um run filho por fold da validação cruzada e
+o modelo final com assinatura de entrada/saída. O registro é recusado se a árvore
+Git tiver alterações não commitadas.
+
+## Logging
+
+Configurado uma única vez no ponto de entrada (`src/main.py`) a partir de
+`configs/logging.yaml` (`dictConfig`): console `rich` + arquivo diário em
+`logs/log_AAAA-MM-DD.log`. Os módulos apenas chamam `get_logger(__name__)`.

@@ -1,0 +1,22 @@
+{
+  "model_name": "xgboost",
+  "data_hash": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+  "random_seed": 42,
+  "imbalance_strategy": "scale_pos_weight",
+  "threshold_cost_optimal": 0.04020100502512563,
+  "threshold_target_recall": 0.6326473951339722,
+  "expected_cost": 1028.0,
+  "best_threshold": 0.04020100502512563,
+  "val_metrics": {
+    "average_precision": 0.8890870945685776,
+    "roc_auc": 0.9742202819277569,
+    "recall": 0.8936170212765957,
+    "precision": 0.75,
+    "f1": 0.8155339805825242,
+    "brier_score": 0.0003221872611902654
+  },
+  "pr_auc_ci_95": [
+    0.8230416622544201,
+    0.9421512651777402
+  ]
+}

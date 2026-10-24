@@ -82,3 +82,31 @@ def test_get_predictor_loads_and_caches_model(
     assert isinstance(predictor, FraudPredictor)
     assert predictor.threshold == 0.65
     assert get_predictor() is predictor
+
+
+def test_get_predictor_prefers_model_uri_env_over_yaml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    synthetic_transactions: pl.DataFrame,
+    settings: Settings,
+) -> None:
+    """``MODEL_URI`` (ex.: volume montado) tem precedência sobre ``model_path`` do YAML."""
+    x, y = prepare_xy(synthetic_transactions)
+    assert y is not None
+    pipeline = build_training_pipeline(ModelName.LOGISTIC_REGRESSION, settings, y)
+    pipeline = train_model(pipeline, x, y)
+    mounted_model = tmp_path / "montado" / "modelo.joblib"
+    save_model(pipeline, mounted_model)
+
+    configs_dir = tmp_path / "configs"
+    configs_dir.mkdir()
+    (configs_dir / "deploy.yaml").write_text(
+        yaml.safe_dump({"api": {"model_path": "models/inexistente.joblib"}}), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "app.dependencies.get_paths",
+        lambda: ProjectPaths(root=tmp_path, configs=configs_dir),
+    )
+    monkeypatch.setenv("MODEL_URI", str(mounted_model))
+
+    assert isinstance(get_predictor(), FraudPredictor)

@@ -40,7 +40,7 @@ jobs:
         run: uv sync --dev
 
       - name: Rodar testes
-        run: uv run pytest -m "not slow"
+        run: uv run pytest -m "not slow" --cov --cov-report=term-missing --cov-report=xml
 
       - name: Upload de cobertura (Codecov)
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

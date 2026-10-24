@@ -15,7 +15,7 @@ on:
         required: true
         type: choice
         options: ["", "PATCH", "MINOR", "MAJOR"]
-        default: ""
+        default: "MAJOR"
 
 permissions:
   contents: write
@@ -50,15 +50,23 @@ jobs:
         id: cz
         run: |
           INCREMENT="${{ inputs.increment }}"
-          if [ -n "$INCREMENT" ]; then
-            uv run cz bump --changelog --yes --increment "$INCREMENT"
+          if git tag --list | grep -q .; then
+            if [ -n "$INCREMENT" ]; then
+              uv run cz bump --changelog --yes --increment "$INCREMENT"
+            else
+              uv run cz bump --changelog --yes
+            fi
           else
-            uv run cz bump --changelog --yes
+            VERSION="$(uv run cz version --project)"
+            git tag "v$VERSION"
+            echo "Nenhuma tag existente. Criando tag inicial v$VERSION sem novo bump."
           fi
           echo "version=$(uv run cz version --project)" >> "$GITHUB_OUTPUT"
 
       - name: Enviar commit e tag
-        run: git push --follow-tags
+        run: |
+          git push
+          git push --tags
 
       - name: Extrair trecho novo do CHANGELOG.md
         run: awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > release-notes.md

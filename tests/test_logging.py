@@ -1,25 +1,32 @@
-"""Testes da configuração de logging (handlers, arquivo diário, YAML)."""
+"""Testes da configuração de logging (dictConfig, arquivo diário, nível, idempotência)."""
 
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Iterator
-from datetime import date
 from pathlib import Path
 
 import pytest
+import yaml
 
-from src.config.logging import _load_logging_config, configure_logging, get_logger
-from src.config.paths import ProjectPaths
+from src.config.logging import (
+    LOGGER_NAMESPACE,
+    _rename_rotated,
+    configure_logging,
+    create_console_handler,
+    create_daily_file_handler,
+    get_logger,
+)
 
 
 @pytest.fixture
 def _isolated_root_logger() -> Iterator[None]:
     """Salva e restaura o estado do logger raiz para não vazar entre testes.
 
-    ``configure_logging`` limpa e substitui os handlers do logger raiz (inclusive
-    o handler de captura do pytest); este fixture garante que o estado original
-    seja restaurado e que os handlers de arquivo criados no teste sejam fechados.
+    ``configure_logging`` substitui os handlers do logger raiz (inclusive o
+    handler de captura do pytest); o fixture restaura o estado original e fecha
+    os handlers de arquivo criados no teste.
     """
     root = logging.getLogger()
     original_handlers = list(root.handlers)
@@ -30,51 +37,107 @@ def _isolated_root_logger() -> Iterator[None]:
             handler.close()
     root.handlers = original_handlers
     root.setLevel(original_level)
+    logging.captureWarnings(False)
 
 
-def test_load_logging_config_returns_empty_dict_when_missing(tmp_path: Path) -> None:
-    """Sem ``logging.yaml``, retorna um dicionário vazio."""
-    assert _load_logging_config(tmp_path) == {}
+@pytest.fixture
+def logging_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """YAML dictConfig mínimo que grava o arquivo de log em ``tmp_path``."""
+    monkeypatch.setattr("src.config.logging.ROOT", tmp_path)
+    config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {"file": {"format": "%(levelname)s | %(name)s | %(message)s"}},
+        "handlers": {
+            "console": {"()": "src.config.logging.create_console_handler"},
+            "file": {
+                "()": "src.config.logging.create_daily_file_handler",
+                "filename": "logs/log.log",
+                "backup_count": 3,
+                "formatter": "file",
+            },
+        },
+        "root": {"level": "INFO", "handlers": ["console", "file"]},
+    }
+    path = tmp_path / "logging.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    return path
 
 
-def test_load_logging_config_reads_yaml(tmp_path: Path) -> None:
-    """Lê o nível definido no YAML de configuração de logging."""
-    (tmp_path / "logging.yaml").write_text("level: DEBUG\n", encoding="utf-8")
-    config = _load_logging_config(tmp_path)
-    assert config["level"] == "DEBUG"
-
-
-def test_configure_logging_creates_daily_log_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_root_logger: None
+def test_configure_logging_creates_log_file_and_returns_namespace_logger(
+    tmp_path: Path, logging_config: Path, _isolated_root_logger: None
 ) -> None:
-    """``configure_logging`` cria o arquivo de log diário no diretório configurado."""
-    configs_dir = tmp_path / "configs"
-    configs_dir.mkdir()
-    (configs_dir / "logging.yaml").write_text("level: INFO\n", encoding="utf-8")
+    """``configure_logging`` cria o arquivo de log e retorna o logger do projeto."""
+    logger = configure_logging(config_path=logging_config)
+    get_logger("teste").info("mensagem de teste")
+    for handler in logging.getLogger().handlers:
+        handler.flush()
 
-    fake_paths = ProjectPaths(root=tmp_path, logs=tmp_path / "logs")
-    monkeypatch.setattr("src.config.logging.get_paths", lambda: fake_paths)
-
-    logger = configure_logging(configs_dir)
-    expected_log_file = tmp_path / "logs" / f"log_{date.today().isoformat()}.log"
-    assert expected_log_file.exists()
-    assert logger.name == "fraude"
-    assert logging.getLogger().level == logging.INFO
+    log_file = tmp_path / "logs" / "log.log"
+    assert logger.name == LOGGER_NAMESPACE
+    assert log_file.exists()
+    assert "mensagem de teste" in log_file.read_text(encoding="utf-8")
 
 
-def test_configure_logging_applies_custom_level(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated_root_logger: None
+def test_configure_logging_level_argument_overrides_yaml(
+    logging_config: Path, _isolated_root_logger: None
 ) -> None:
-    """Um nível customizado no YAML é aplicado ao logger raiz."""
-    configs_dir = tmp_path / "configs"
-    configs_dir.mkdir()
-    (configs_dir / "logging.yaml").write_text("level: WARNING\n", encoding="utf-8")
-
-    fake_paths = ProjectPaths(root=tmp_path, logs=tmp_path / "logs")
-    monkeypatch.setattr("src.config.logging.get_paths", lambda: fake_paths)
-
-    configure_logging(configs_dir)
+    """O argumento ``level`` sobrescreve o nível definido no YAML."""
+    configure_logging(level="warning", config_path=logging_config)
     assert logging.getLogger().level == logging.WARNING
+
+
+def test_configure_logging_is_idempotent(
+    logging_config: Path, _isolated_root_logger: None
+) -> None:
+    """Reconfigurar não duplica handlers no root."""
+    configure_logging(config_path=logging_config)
+    configure_logging(config_path=logging_config)
+    assert len(logging.getLogger().handlers) == 2
+
+
+def test_configure_logging_raises_when_yaml_missing(tmp_path: Path) -> None:
+    """YAML inexistente levanta ``FileNotFoundError``."""
+    with pytest.raises(FileNotFoundError):
+        configure_logging(config_path=tmp_path / "ausente.yaml")
+
+
+def test_configure_logging_routes_warnings_to_log_file(
+    tmp_path: Path, logging_config: Path, _isolated_root_logger: None
+) -> None:
+    """``warnings.warn`` passa pelos mesmos handlers do logging."""
+    configure_logging(config_path=logging_config)
+    warnings.warn("aviso de teste", UserWarning, stacklevel=1)
+    for handler in logging.getLogger().handlers:
+        handler.flush()
+    assert "aviso de teste" in (tmp_path / "logs" / "log.log").read_text(encoding="utf-8")
+
+
+def test_rename_rotated_uses_date_suffix_before_extension() -> None:
+    """O arquivo rotacionado vira ``log_AAAA-MM-DD.log``."""
+    renamed = _rename_rotated(str(Path("logs") / "log.log.2026-09-27"))
+    assert Path(renamed).name == "log_2026-09-27.log"
+
+
+def test_create_daily_file_handler_creates_parent_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """O handler cria o diretório de logs e rotaciona à meia-noite."""
+    monkeypatch.setattr("src.config.logging.ROOT", tmp_path)
+    handler = create_daily_file_handler("logs/log.log", backup_count=5)
+    try:
+        assert (tmp_path / "logs").is_dir()
+        assert handler.backupCount == 5
+        assert handler.when == "MIDNIGHT"
+    finally:
+        handler.close()
+
+
+def test_create_console_handler_shares_console() -> None:
+    """O handler de console usa o ``Console`` compartilhado com ``rich.progress``."""
+    from src.config.logging import CONSOLE
+
+    assert create_console_handler().console is CONSOLE
 
 
 def test_get_logger_uses_fraude_namespace() -> None:

@@ -38,7 +38,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: "3.12"
 
-      - run: uv sync --dev
+      - run: uv sync --group docs
 
       - name: Build estrito (falha em link quebrado / warning)
         run: uv run mkdocs build --strict
@@ -61,7 +61,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: "3.12"
 
-      - run: uv sync --dev
+      - run: uv sync --group docs
 
       - name: Configurar identidade do git
         run: |

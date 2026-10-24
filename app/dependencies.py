@@ -1,11 +1,13 @@
 """Carregamento e injeção do preditor treinado na API.
 
-Lê os caminhos e o threshold de ``configs/deploy.yaml`` e mantém uma única
-instância do preditor em memória (carregada no startup da aplicação).
+Lê o caminho do modelo (variável ``MODEL_URI`` ou ``configs/deploy.yaml``) e o
+threshold de ``configs/deploy.yaml`` e mantém uma única instância do preditor em
+memória (carregada no startup da aplicação).
 """
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -41,6 +43,10 @@ def get_predictor() -> FraudPredictor:
     """
     config = _load_deploy_config()
     root = get_paths().root
-    model_path = root / config.get("model_path", "models/fraud_model.joblib")
+    # MODEL_URI (ex.: volume montado em /models) tem precedência sobre o YAML.
+    model_uri = os.environ.get("MODEL_URI") or config.get("model_path", "models/fraud_model.joblib")
+    model_path = Path(model_uri)
+    if not model_path.is_absolute():
+        model_path = root / model_path
     threshold = float(config.get("decision_threshold", 0.5))
-    return FraudPredictor.from_path(Path(model_path), threshold=threshold)
+    return FraudPredictor.from_path(model_path, threshold=threshold)

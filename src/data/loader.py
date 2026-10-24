@@ -1,4 +1,4 @@
-"""Carregamento do dataset bruto de transações com Polars.
+"""Carregamento do dataset bruto (camada bronze) de transações com Polars.
 
 Lê o CSV original, valida o contrato de dados (pandera) e retorna um
 ``pl.DataFrame`` pronto para as etapas seguintes. Nunca modifica o arquivo bruto.
@@ -29,7 +29,7 @@ def load_raw_transactions(
     Parameters
     ----------
     path : Path, optional
-        Caminho do CSV bruto. Por padrão usa ``data/raw/creditcard.csv``.
+        Caminho do CSV bruto. Por padrão usa ``data/bronze/creditcard.csv``.
     validate : bool, optional
         Se ``True`` (padrão), valida o DataFrame contra o contrato de dados.
 
@@ -51,11 +51,11 @@ def load_raw_transactions(
     >>> "Class" in df.columns  # doctest: +SKIP
     True
     """
-    path = path or get_paths().data_raw
+    path = path or get_paths().data_bronze
     if not path.exists():
         raise RawDataNotFoundError(
             f"Dados brutos não encontrados em {path}. "
-            "Baixe o dataset Credit Card Fraud (ULB) para data/raw/."
+            "Baixe o dataset Credit Card Fraud (ULB) para data/bronze/."
         )
 
     logger.info("Carregando transações brutas de %s", path)
