@@ -1,4 +1,4 @@
-# 🛡️ Detecção de Fraude com Pipeline MLOps Completo: PR-AUC 0,82 com IC 95% em dados com 0,17% de fraudes
+# 🛡️ Detecção de Fraude com Pipeline MLOps: PR-AUC 0,82 com IC 95% em dados com 0,17% de fraudes
 
 [![CI](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/ci.yml/badge.svg)](https://github.com/luanfreitas5/mlops-deteccao-fraude/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/luanfreitas5/mlops-deteccao-fraude/graph/badge.svg)](https://codecov.io/gh/luanfreitas5/mlops-deteccao-fraude)
