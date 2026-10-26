@@ -12,6 +12,7 @@ import pytest
 from sklearn.linear_model import LogisticRegression
 
 from src.exceptions.pipeline import DirtyWorkingTreeError
+from src.experiment import tracker as tracker_module
 from src.experiment.tracker import MLflowTracker, compute_git_sha
 
 
@@ -92,8 +93,8 @@ def test_log_model_passes_signature_and_input_example(
     """
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(
-        mlflow.sklearn,
-        "log_model",
+        tracker_module,
+        "log_sklearn_model",
         lambda model, **kwargs: calls.append({"model": model, **kwargs}),
     )
     x = pd.DataFrame({"a": np.linspace(0, 1, 20), "b": np.linspace(1, 0, 20)})
