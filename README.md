@@ -8,7 +8,7 @@
 
 > **Resultado:** o XGBoost atinge PR-AUC = **0,815 (IC 95%: 0,732–0,892)** no teste (≈ 56,7 mil transações, ≈ 95 fraudes) do dataset *Credit Card Fraud* (ULB), com recall de 0,81 e precisão de 0,73 no limiar escolhido por custo. A comparação com o baseline (Regressão Logística) **ainda não foi medida** — ver [Resultados](#-resultados). O projeto empacota o modelo como sistema: dados em camadas, API, rastreamento de experimentos e CI/CD.
 
-![Detecção de Fraude com Pipeline MLOps](banner/projetos/fraude.png)
+![Detecção de Fraude com Pipeline MLOps](banner/fraude.png)
 
 ## 🎯 Problema
 
