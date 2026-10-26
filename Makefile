@@ -20,6 +20,7 @@ install:  ## Instala todos os grupos de dependências e os hooks do pre-commit
 
 hooks:  ## Reinstala os hooks do pre-commit
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
+	$(UV) run detect-secrets scan > .secrets.baseline
 
 update:  ## Atualiza o lock e sincroniza o ambiente
 	$(UV) lock --upgrade

@@ -16,9 +16,9 @@ from pathlib import Path
 from typing import Any
 
 import mlflow
-import mlflow.sklearn
 import pandas as pd
 from mlflow.models import infer_signature
+from mlflow.sklearn import log_model as log_sklearn_model
 
 from src.config.logging import get_logger
 from src.exceptions.pipeline import DirtyWorkingTreeError
@@ -164,9 +164,9 @@ class MLflowTracker:
             with self._mlflow.start_run(
                 run_name=f"fold{fold}",
                 nested=True,
-                tags={**self._lineage_tags, "fold": str(fold)},
+                tags=self._lineage_tags | {"fold": str(fold)},
             ):
-                self._mlflow.log_metric(metric_name, float(score))
+                self._mlflow.log_metric(metric_name, score)
 
     def log_model(self, model: Any, x_example: pd.DataFrame, name: str = "model") -> None:
         """Registra o modelo (já ajustado em todo o treino) com assinatura e exemplo.
@@ -183,7 +183,7 @@ class MLflowTracker:
         sample = x_example.head(100)
         signature = infer_signature(sample, model.predict_proba(sample))
         # cloudpickle: modelo próprio e confiável; o formato skops recusa pipelines com XGBoost.
-        mlflow.sklearn.log_model(
+        log_sklearn_model(
             model,
             name=name,
             signature=signature,

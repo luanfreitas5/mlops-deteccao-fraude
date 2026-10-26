@@ -87,9 +87,7 @@ def test_configure_logging_level_argument_overrides_yaml(
     assert logging.getLogger().level == logging.WARNING
 
 
-def test_configure_logging_is_idempotent(
-    logging_config: Path, _isolated_root_logger: None
-) -> None:
+def test_configure_logging_is_idempotent(logging_config: Path, _isolated_root_logger: None) -> None:
     """Reconfigurar não duplica handlers no root."""
     configure_logging(config_path=logging_config)
     configure_logging(config_path=logging_config)

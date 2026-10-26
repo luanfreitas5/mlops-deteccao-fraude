@@ -151,6 +151,7 @@ ignore = [
     "PLR0913", # muitos argumentos em função — comum em pipelines de ML
     "PLR2004", # "magic value" em comparação — comum em thresholds de modelo
     "TRY003",  # mensagem longa em exceção customizada
+    "PLC0415", # import fora do topo — usado em testes para isolar imports
 ]
 
 [tool.ruff.lint.isort]

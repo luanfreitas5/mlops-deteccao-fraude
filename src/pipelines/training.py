@@ -73,9 +73,7 @@ def run_training_pipeline(
     train_path = paths.data_gold / "train.parquet"
     val_path = paths.data_gold / "val.parquet"
     if not train_path.exists() or not val_path.exists():
-        raise FileNotFoundError(
-            "Dados gold não encontrados. Execute o pré-processamento antes."
-        )
+        raise FileNotFoundError("Dados gold não encontrados. Execute o pré-processamento antes.")
 
     # O tracker é criado antes do treino: árvore suja falha cedo, sem gastar o treino.
     tracker = _create_tracker(settings)
@@ -147,7 +145,16 @@ def run_training_pipeline(
     with metrics_path.open("w", encoding="utf-8") as file:
         json.dump(metadata, file, ensure_ascii=False, indent=2)
 
-    _log_to_mlflow(tracker, settings, model_name, pipeline, x_train, metadata, cv, data_hash)
+    _log_to_mlflow(
+        tracker,
+        settings=settings,
+        model_name=model_name,
+        pipeline=pipeline,
+        x_train=x_train,
+        metadata=metadata,
+        cv=cv,
+        data_hash=data_hash,
+    )
 
     return {
         "metrics": result.metrics,
@@ -178,6 +185,7 @@ def _create_tracker(settings: Settings) -> MLflowTracker | None:
 
 def _log_to_mlflow(
     tracker: MLflowTracker | None,
+    *,
     settings: Settings,
     model_name: ModelName | str,
     pipeline: Any,
